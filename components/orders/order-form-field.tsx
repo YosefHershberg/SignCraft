@@ -65,6 +65,11 @@ export function fieldError(name: FieldName, values: Values): string | null {
   return result.error.issues[0]?.message ?? `${LABELS[name]} is invalid.`;
 }
 
+/** The id of a field's error message; controls point at it with `aria-describedby`. */
+export function fieldErrorId(name: FieldName): string {
+  return `order-${name}-error`;
+}
+
 export function Field({
   name,
   error,
@@ -88,28 +93,56 @@ export function Field({
         {optional && <span className="ml-1 font-normal tracking-normal text-slate-400 normal-case">optional</span>}
       </label>
       {children}
-      {error && <span className="text-[11px] leading-4 text-[#DC2626]">{error}</span>}
+      {error && (
+        <span id={fieldErrorId(name)} className="text-[11px] leading-4 text-[#DC2626]">
+          {error}
+        </span>
+      )}
     </div>
   );
 }
 
 const longDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
+/**
+ * A picked calendar day is stored as noon UTC of that day, so every viewer —
+ * whatever their offset — reads back the same calendar date. `toISOString()` on
+ * the picker's local-midnight Date would shift the day for anyone west of UTC.
+ */
+export function calendarDayToIso(date: Date): string {
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12)).toISOString();
+}
+
+/** The inverse: the stored day as a local Date, which is what the picker compares. */
+export function isoToCalendarDay(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return new Date(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
+}
+
 /** A Shadcn Select bound to one form field. Selects never blur, so they validate on change. */
 export function SelectField({
   name,
   value,
+  error,
   options,
   onChange,
 }: {
   name: FieldName;
   value: string;
+  error?: string | null;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger id={`order-${name}`} className={cn(FIELD_INPUT_CLASS, 'w-full')}>
+      <SelectTrigger
+        id={`order-${name}`}
+        aria-invalid={!!error}
+        aria-describedby={error ? fieldErrorId(name) : undefined}
+        className={cn(FIELD_INPUT_CLASS, 'w-full')}
+      >
         <SelectValue placeholder="Select…" />
       </SelectTrigger>
       <SelectContent>
@@ -124,7 +157,17 @@ export function SelectField({
 }
 
 /** Calendar in a Popover; the value is an ISO string so it drops straight into the schema. */
-export function DateField({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
+export function DateField({
+  value,
+  error,
+  onChange,
+}: {
+  value: string;
+  error?: string | null;
+  onChange: (iso: string) => void;
+}) {
+  const day = isoToCalendarDay(value);
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -132,17 +175,15 @@ export function DateField({ value, onChange }: { value: string; onChange: (iso: 
           id="order-dueDate"
           type="button"
           variant="outline"
+          aria-invalid={!!error}
+          aria-describedby={error ? fieldErrorId('dueDate') : undefined}
           className={cn(FIELD_INPUT_CLASS, 'w-full justify-start border font-normal', !value && 'text-slate-400')}
         >
-          {value ? longDate.format(new Date(value)) : 'Pick a date'}
+          {day ? longDate.format(day) : 'Pick a date'}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={value ? new Date(value) : undefined}
-          onSelect={(date) => onChange(date ? date.toISOString() : '')}
-        />
+        <Calendar mode="single" selected={day} onSelect={(date) => onChange(date ? calendarDayToIso(date) : '')} />
       </PopoverContent>
     </Popover>
   );

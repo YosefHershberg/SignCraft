@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -28,9 +28,11 @@ import {
   SelectField,
   buildInput,
   fieldError,
+  fieldErrorId,
   type FieldName,
   type Values,
 } from './order-form-field';
+import { useRestoreFocus, visibleElement } from './use-restore-focus';
 
 const SIGN_TYPE_OPTIONS = SIGN_TYPES.map((value) => ({ value, label: SIGN_TYPE_LABEL[value] }));
 
@@ -63,11 +65,25 @@ export function CreateOrderDialog({
 
   const blur = (name: FieldName) => () => setErrors((e) => ({ ...e, [name]: fieldError(name, values) }));
 
-  function reset() {
+  const reset = useCallback(() => {
     setValues(EMPTY_VALUES);
     setErrors({});
     setServerError(null);
-  }
+  }, []);
+
+  // The dialog stays mounted between openings, so every close path — Cancel,
+  // Escape, the ✕, a click outside — has to leave the form empty. Resetting on
+  // the `open → false` edge covers all of them at once.
+  useEffect(() => {
+    if (!open) reset();
+  }, [open, reset]);
+
+  const restoreFocus = useRestoreFocus(
+    open,
+    // The opener is normally the header's "New order" button; the mobile FAB is
+    // the only one addressable by selector if that element is gone.
+    useCallback(() => visibleElement('[aria-label="New order"]'), [])
+  );
 
   function submit() {
     if (!parsed.success) return;
@@ -90,6 +106,7 @@ export function CreateOrderDialog({
       placeholder={placeholder}
       value={values[name]}
       aria-invalid={!!errors[name]}
+      aria-describedby={errors[name] ? fieldErrorId(name) : undefined}
       onChange={(e) => set(name, e.target.value)}
       onBlur={blur(name)}
       className={INPUT}
@@ -97,14 +114,11 @@ export function CreateOrderDialog({
   );
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) reset();
-        onOpenChange(next);
-      }}
-    >
-      <DialogContent className="max-h-[92vh] gap-4 overflow-y-auto rounded-[12px] p-6 sm:max-w-[560px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        onCloseAutoFocus={restoreFocus}
+        className="max-h-[92vh] gap-4 overflow-y-auto rounded-[12px] p-6 sm:max-w-[560px]"
+      >
         <DialogHeader className="gap-1">
           <DialogTitle className="text-[20px] leading-7 tracking-[-0.01em] text-slate-900">New order</DialogTitle>
           <DialogDescription className="text-[14px] leading-5 text-slate-600">
@@ -124,6 +138,7 @@ export function CreateOrderDialog({
             <SelectField
               name="signType"
               value={values.signType}
+              error={errors.signType}
               options={SIGN_TYPE_OPTIONS}
               onChange={(v) => set('signType', v, true)}
             />
@@ -136,6 +151,7 @@ export function CreateOrderDialog({
                 inputMode="numeric"
                 value={values[name]}
                 aria-invalid={!!errors[name]}
+                aria-describedby={errors[name] ? fieldErrorId(name) : undefined}
                 onChange={(e) => set(name, e.target.value.replace(/[^0-9]/g, ''))}
                 onBlur={blur(name)}
                 className={cn(INPUT, 'font-mono text-[13px] font-medium')}
@@ -149,13 +165,14 @@ export function CreateOrderDialog({
             <SelectField
               name="vendorId"
               value={values.vendorId}
+              error={errors.vendorId}
               options={vendors.map((vendor) => ({ value: vendor.id, label: vendor.name }))}
               onChange={(v) => set('vendorId', v, true)}
             />
           </Field>
 
           <Field name="dueDate" error={errors.dueDate}>
-            <DateField value={values.dueDate} onChange={(iso) => set('dueDate', iso, true)} />
+            <DateField value={values.dueDate} error={errors.dueDate} onChange={(iso) => set('dueDate', iso, true)} />
           </Field>
         </div>
 
@@ -167,6 +184,8 @@ export function CreateOrderDialog({
           <Textarea
             id="order-notes"
             value={values.notes}
+            aria-invalid={!!errors.notes}
+            aria-describedby={errors.notes ? fieldErrorId('notes') : undefined}
             onChange={(e) => set('notes', e.target.value)}
             onBlur={blur('notes')}
             className="min-h-16 resize-none rounded-[8px] border-slate-300 text-[14px] leading-5"

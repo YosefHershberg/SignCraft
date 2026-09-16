@@ -2,26 +2,10 @@
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { orderActionsFor } from '@/lib/domain/permissions';
+import { visibleOrderActions } from '@/lib/domain/order-actions';
 import { ACTION_LABEL } from '@/lib/domain/status-meta';
 import type { ActionAvailability, OrderAction, OrderDTO, Persona } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
-
-/**
- * `complete` belongs to the installer's JobPanel (it is guarded by the claim,
- * not by the order), so the order action bar never offers it to an installer.
- */
-function visibleActions(order: OrderDTO, persona: Persona, now: Date): ActionAvailability[] {
-  const ctx = {
-    status: order.status,
-    vendorId: order.vendorId,
-    hasUploadedAsset: order.assets.some((a) => a.status === 'UPLOADED'),
-    installJob: order.installJob,
-  };
-  return orderActionsFor(persona, ctx, now).filter(
-    (a) => !(persona.kind === 'installer' && a.action === 'complete')
-  );
-}
 
 function ActionButton({
   availability,
@@ -78,7 +62,7 @@ export function OrderActions({
   now: number;
   onAction: (order: OrderDTO, action: OrderAction) => void;
 }) {
-  const actions = visibleActions(order, persona, new Date(now));
+  const actions = visibleOrderActions(persona, order, new Date(now));
   const hint = actions.find((a) => !a.enabled)?.reason;
 
   return (

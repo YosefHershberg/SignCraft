@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import type { InstallerDTO, OrderAction, OrderDTO, Persona, VendorDTO } from '@/lib/domain/types';
 import { useOrder } from '@/lib/query/hooks';
@@ -8,6 +8,7 @@ import { DetailsGrid } from './details-grid';
 import { HistoryTimeline } from './history-timeline';
 import { OrderActions } from './order-actions';
 import { StatusBadge } from './status-badge';
+import { useRestoreFocus, visibleElement } from './use-restore-focus';
 
 export interface OrderDetailSheetProps {
   /** `null` closes the sheet; the order itself is read live from the cache. */
@@ -48,6 +49,15 @@ export function OrderDetailSheet({
     if (missing) onOpenChange(false);
   }, [missing, onOpenChange]);
 
+  // Radix would hand focus back to a Trigger; this sheet is controlled and has
+  // none, so closing it would drop focus on <body>. The card that opened it is
+  // both the captured opener and the fallback (the board renders a mobile and a
+  // desktop copy, `visibleElement` picks the on-screen one).
+  const restoreFocus = useRestoreFocus(
+    open,
+    useCallback(() => (orderId ? visibleElement(`[data-order-id="${orderId}"]`) : null), [orderId])
+  );
+
   if (!order) return null;
 
   const vendorName = vendors.find((v) => v.id === order.vendorId)?.name ?? 'Unknown vendor';
@@ -61,6 +71,7 @@ export function OrderDetailSheet({
       {open && <div aria-hidden className="pointer-events-none fixed inset-0 z-40 bg-slate-900/35 sm:top-14" />}
       <SheetContent
         side="right"
+        onCloseAutoFocus={restoreFocus}
         onInteractOutside={(event) => {
           // The header and any portalled menu are "outside" the sheet but are
           // not a dismissal — that is exactly the persona switch in §7.8.

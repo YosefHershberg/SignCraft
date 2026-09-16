@@ -117,6 +117,7 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
           order={pendingOrder}
           action={pendingAction.action}
           persona={persona}
+          now={now}
         />
       )}
 

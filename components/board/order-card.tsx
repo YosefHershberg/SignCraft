@@ -9,7 +9,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDue } from '@/lib/domain/format';
-import { jobActionsFor, orderActionsFor } from '@/lib/domain/permissions';
+import { visibleOrderActions } from '@/lib/domain/order-actions';
+import { jobActionsFor } from '@/lib/domain/permissions';
 import { ACTION_LABEL, SIGN_TYPE_LABEL, STATUS_META } from '@/lib/domain/status-meta';
 import type { InstallerDTO, JobDTO, OrderAction, OrderDTO, Persona } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
@@ -46,16 +47,7 @@ export function OrderCard({
 }: OrderCardProps) {
   const meta = STATUS_META[order.status];
   const at = new Date(now);
-  const ctx = {
-    status: order.status,
-    vendorId: order.vendorId,
-    hasUploadedAsset: order.assets.some((a) => a.status === 'UPLOADED'),
-    installJob: order.installJob,
-  };
-
-  const actions = orderActionsFor(persona, ctx, at).filter(
-    (a) => !(persona.kind === 'installer' && a.action === 'complete')
-  );
+  const actions = visibleOrderActions(persona, order, at);
   const jobActions = jobActionsFor(persona, order.installJob, at);
   // Muted only when the persona can do *nothing* with the card — a card with a
   // disabled-but-listed action still reads as actionable (DESIGN.md "Order card").
@@ -71,6 +63,9 @@ export function OrderCard({
       role="button"
       tabIndex={0}
       aria-label={`${order.orderNumber} — ${order.title}`}
+      // The detail sheet focuses this card again when it closes and the element
+      // that opened it is gone (components/orders/use-restore-focus.ts).
+      data-order-id={order.id}
       data-selected={selected ? 'true' : undefined}
       onClick={() => onOpen(order.id)}
       onKeyDown={(event) => {

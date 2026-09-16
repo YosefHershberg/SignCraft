@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { orderCtx } from '@/lib/domain/order-actions';
 import { checkTransition } from '@/lib/domain/permissions';
 import { ACTION_CONSEQUENCE, ACTION_LABEL, STATUS_META } from '@/lib/domain/status-meta';
 import { ACTION_TARGET } from '@/lib/domain/state-machine';
@@ -22,6 +23,7 @@ import { keys } from '@/lib/query/keys';
 import { cn } from '@/lib/utils';
 import { InlineError } from './inline-error';
 import { StatusBadge } from './status-badge';
+import { useRestoreFocus, visibleElement } from './use-restore-focus';
 
 export function TransitionDialog({
   open,
@@ -29,17 +31,24 @@ export function TransitionDialog({
   order,
   action,
   persona,
+  now,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   order: OrderDTO;
   action: OrderAction;
   persona: Persona;
+  /** Epoch ms from the board clock, so claim-sensitive guards agree with the card. */
+  now: number;
 }) {
   const queryClient = useQueryClient();
   const transition = useTransition();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<ApiClientError | null>(null);
+  // A 409 means the version this dialog holds is stale, so retrying with it can
+  // only fail again: "Refresh order" is the one forward path until the dialog
+  // reopens or a fresh version of the order arrives.
+  const [conflict, setConflict] = useState(false);
 
   const target = ACTION_TARGET[action];
   const destructive = action === 'cancel';
@@ -53,25 +62,27 @@ export function TransitionDialog({
     expectedVersion.current = order.version;
     setReason('');
     setError(null);
+    setConflict(false);
     // Re-arming on `order.id` only — a realtime bump to `order.version` while
     // the dialog is open must leave the snapshot stale on purpose.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order.id]);
 
-  const verdict = checkTransition(
-    persona,
-    {
-      status: order.status,
-      vendorId: order.vendorId,
-      hasUploadedAsset: order.assets.some((a) => a.status === 'UPLOADED'),
-      installJob: order.installJob,
-    },
-    target,
-    new Date()
+  // A newer version of this order reached the tab: the board is no longer the
+  // one that lost the race, so let the user try again.
+  useEffect(() => setConflict(false), [order.version]);
+
+  const restoreFocus = useRestoreFocus(
+    open,
+    // The opener is the sheet's action button or the card's ⋯ item; the latter
+    // unmounts with its menu, so the card itself is the fallback.
+    useCallback(() => visibleElement(`[data-order-id="${order.id}"]`), [order.id])
   );
 
+  const verdict = checkTransition(persona, orderCtx(order), target, new Date(now));
+
   const reasonMissing = destructive && reason.trim().length === 0;
-  const canConfirm = verdict.ok && !reasonMissing && !transition.isPending;
+  const canConfirm = verdict.ok && !reasonMissing && !transition.isPending && !conflict;
 
   function confirm() {
     setError(null);
@@ -84,14 +95,18 @@ export function TransitionDialog({
       },
       {
         onSuccess: () => onOpenChange(false),
-        onError: (err) => setError(err instanceof ApiClientError ? err : new ApiClientError(0, 'UNKNOWN', String(err))),
+        onError: (err) => {
+          const apiError = err instanceof ApiClientError ? err : new ApiClientError(0, 'UNKNOWN', String(err));
+          setError(apiError);
+          setConflict(apiError.status === 409);
+        },
       }
     );
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-4 rounded-[12px] p-6 sm:max-w-[440px]">
+      <DialogContent onCloseAutoFocus={restoreFocus} className="gap-4 rounded-[12px] p-6 sm:max-w-[440px]">
         <DialogHeader className="gap-4">
           <DialogTitle className="text-[20px] leading-7 tracking-[-0.01em] text-slate-900">
             {destructive ? `Cancel ${order.orderNumber}?` : 'Move order'}
