@@ -213,6 +213,18 @@ describe('assets service', () => {
     expect(db.uploadId).toBeNull();
   });
 
+  it("abortAsset with reason 'error' marks FAILED so the row can offer Retry", async () => {
+    const { result } = await createUploadingAsset();
+
+    await abortAsset(result.asset.id, 'error');
+
+    // The R2 upload is still abandoned — only the terminal status differs.
+    expect(storage.abortMultipart).toHaveBeenCalledWith(expect.stringContaining('orders/'), 'u1');
+    const db = await prisma.asset.findUniqueOrThrow({ where: { id: result.asset.id } });
+    expect(db.status).toBe('FAILED');
+    expect(db.uploadId).toBeNull();
+  });
+
   it('abortAsset is a no-op once the asset is already terminal', async () => {
     const { result } = await createUploadingAsset();
     await prisma.asset.update({ where: { id: result.asset.id }, data: { status: 'UPLOADED' } });

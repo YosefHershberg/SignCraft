@@ -31,15 +31,15 @@ export function UploadPanel({ order, persona }: { order: OrderDTO; persona: Pers
   const totalBytes = summary.reduce((sum, asset) => sum + asset.sizeBytes, 0);
 
   /**
-   * Every upload is awaited here purely to surface its failure: the row itself
-   * is driven by the cache (mutation responses plus SSE), so nothing else is
-   * waiting on this promise.
+   * Every call is awaited here purely to surface its failure as a toast (§4.11):
+   * the row itself is driven by the cache (mutation responses plus SSE), so
+   * nothing else is waiting on this promise.
    */
-  async function run(action: () => Promise<unknown>): Promise<unknown> {
+  async function run(action: () => Promise<unknown>, what = 'Upload'): Promise<unknown> {
     try {
       return await action();
     } catch (err) {
-      toast.error(`Upload failed — ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`${what} failed — ${err instanceof Error ? err.message : String(err)}`);
       return undefined;
     }
   }
@@ -79,14 +79,16 @@ export function UploadPanel({ order, persona }: { order: OrderDTO; persona: Pers
           key={asset.id}
           asset={asset}
           local={local[asset.id]}
-          onAbort={() => abort(asset.id)}
+          canUpload={canUpload}
+          onAbort={() => void run(() => abort(asset.id), 'Abort')}
           onRetry={() => void onRetry(asset)}
         />
       ))}
 
       {canUpload && (
         <div className="flex items-center gap-2 pt-0.5">
-          <input ref={fileInput} type="file" className="sr-only" onChange={onPick} aria-label="Upload file" />
+          {/* Only the visible button is announced; this input is its mechanism. */}
+          <input ref={fileInput} type="file" className="sr-only" tabIndex={-1} aria-hidden onChange={onPick} />
           <Button
             type="button"
             variant="outline"

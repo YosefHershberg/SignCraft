@@ -26,11 +26,14 @@ const BADGE: Record<AssetStatus, { label: string; bg: string; fg: string }> = {
 export function AssetRow({
   asset,
   local,
+  canUpload,
   onAbort,
   onRetry,
 }: {
   asset: AssetDTO;
   local?: LocalProgress;
+  /** `checkUpload(persona, status).ok` — only then are abort and retry offered. */
+  canUpload: boolean;
   onAbort: () => void;
   onRetry: () => void;
 }) {
@@ -80,7 +83,7 @@ export function AssetRow({
           {badge.label}
         </span>
 
-        {inFlight && (
+        {inFlight && canUpload && (
           <button
             type="button"
             onClick={onAbort}
@@ -91,7 +94,7 @@ export function AssetRow({
           </button>
         )}
 
-        {asset.status === 'FAILED' && (
+        {asset.status === 'FAILED' && canUpload && (
           <button
             type="button"
             onClick={onRetry}

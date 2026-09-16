@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db/prisma';
 import { ApiError, fromVerdict } from '@/lib/api/errors';
 import { checkUpload } from '@/lib/domain/permissions';
 import { PART_SIZE } from '@/lib/domain/constants';
-import type { CreateAssetInput } from '@/lib/domain/schemas';
+import type { AbortReason, CreateAssetInput } from '@/lib/domain/schemas';
 import type { AssetDTO, Persona } from '@/lib/domain/types';
 import { storage, storageKeyFor } from '@/lib/storage/r2';
 import { planParts } from '@/lib/upload/plan';
@@ -129,8 +129,15 @@ export async function completeAsset(
   return toAssetDTO(updated);
 }
 
-/** Aborts a multipart upload. A no-op once the asset is already in a terminal state. */
-export async function abortAsset(assetId: string): Promise<void> {
+/**
+ * Aborts a multipart upload. A no-op once the asset is already in a terminal state.
+ *
+ * `reason` decides only the terminal status: a client that exhausted its part
+ * retries reports `'error'` and the asset lands FAILED, so the row offers Retry
+ * (UI spec §7.6); a user pressing ✕ leaves it ABORTED. Either way the R2
+ * multipart is abandoned, so no orphaned parts are left behind.
+ */
+export async function abortAsset(assetId: string, reason: AbortReason = 'user'): Promise<void> {
   const asset = await prisma.asset.findUnique({ where: { id: assetId } });
   if (!asset) throw new ApiError(404, 'NOT_FOUND');
   if (asset.status === 'UPLOADED' || asset.status === 'FAILED' || asset.status === 'ABORTED') return;
@@ -141,5 +148,8 @@ export async function abortAsset(assetId: string): Promise<void> {
     // best-effort: R2 cleanup failures never block the local abort transition
   }
 
-  await prisma.asset.update({ where: { id: assetId }, data: { status: 'ABORTED', uploadId: null } });
+  await prisma.asset.update({
+    where: { id: assetId },
+    data: { status: reason === 'error' ? 'FAILED' : 'ABORTED', uploadId: null },
+  });
 }

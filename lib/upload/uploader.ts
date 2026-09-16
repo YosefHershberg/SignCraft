@@ -1,5 +1,5 @@
 import { MAX_PARALLEL_PARTS, MAX_PART_RETRIES, PRESIGN_BATCH } from '@/lib/domain/constants';
-import { partRange, shouldReportProgress, type UploadPlan } from '@/lib/upload/plan';
+import { estimate, partRange, shouldReportProgress, type UploadPlan } from '@/lib/upload/plan';
 import type { PartSource } from '@/lib/upload/part-source';
 
 export interface UploaderApi {
@@ -196,10 +196,7 @@ export class MultipartUploader {
     const bytesUploaded = this.totalUploaded();
     const pct = this.opts.sizeBytes > 0 ? Math.min(100, (bytesUploaded / this.opts.sizeBytes) * 100) : 100;
     const now = this.now();
-    const elapsedMs = now - this.startedAt;
-    const bytesPerSecond = elapsedMs > 0 ? (bytesUploaded / elapsedMs) * 1000 : 0;
-    const remaining = this.opts.sizeBytes - bytesUploaded;
-    const etaMs = bytesPerSecond > 0 ? (remaining / bytesPerSecond) * 1000 : 0;
+    const { bytesPerSecond, etaMs } = estimate(bytesUploaded, this.opts.sizeBytes, this.startedAt, now);
 
     this.opts.onProgress?.({ bytesUploaded, pct, bytesPerSecond, etaMs });
 

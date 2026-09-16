@@ -9,8 +9,10 @@ import {
   type QueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { AssetDTO, BootstrapDTO, JobDTO, OrderDTO } from '@/lib/domain/types';
+import type { AssetDTO, BootstrapDTO, JobDTO, OrderDTO, Persona } from '@/lib/domain/types';
 import type {
+  AbortInput,
+  AbortReason,
   CompleteInput,
   CreateAssetInput,
   CreateOrderInput,
@@ -150,45 +152,57 @@ export function useCreateAsset() {
   });
 }
 
-export function useAbortAsset() {
-  const qc = useQueryClient();
-  const { persona } = usePersona();
-  return useMutation({
-    mutationFn: ({ assetId }: { assetId: string }) =>
-      api<void>(`/api/assets/${assetId}/abort`, { method: 'POST', persona }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.bootstrap }),
-    onError: (err) => invalidateOn409(qc, err),
-  });
+// --- Upload pipeline wire calls (Task 15) ---
+
+export interface UploadWireApi {
+  presign(assetId: string, partNumbers: number[]): Promise<{ partNumber: number; url: string }[]>;
+  progress(assetId: string, bytesUploaded: number): Promise<void>;
+  complete(assetId: string, parts: CompleteInput['parts']): Promise<void>;
+  abort(assetId: string, reason: AbortReason): Promise<void>;
 }
 
-// --- Thin wrappers for Task 15 (upload pipeline UI) ---
-
-export function usePresignParts() {
-  const { persona } = usePersona();
-  return useMutation({
-    mutationFn: ({ assetId, ...body }: { assetId: string } & PartsInput) =>
+/**
+ * The four calls an in-flight upload makes, pinned to one persona.
+ *
+ * Deliberately not mutation hooks: a hook reads `usePersona()` per render, so
+ * switching persona mid-upload (§7.8) would sign the *next* presign with the
+ * new persona and be refused with a 403. The uploader captures this object
+ * when it starts and keeps using it. Cache patching that the hooks' `onSuccess`
+ * used to do happens here instead.
+ */
+export function uploadWireApi(persona: Persona, qc: QueryClient): UploadWireApi {
+  return {
+    presign: (assetId, partNumbers) =>
       api<{ urls: { partNumber: number; url: string }[] }>(`/api/assets/${assetId}/parts`, {
         method: 'POST',
-        body,
+        body: { partNumbers } satisfies PartsInput,
+        persona,
+      }).then((res) => res.urls),
+
+    progress: (assetId, bytesUploaded) =>
+      api<void>(`/api/assets/${assetId}/progress`, {
+        method: 'POST',
+        body: { bytesUploaded } satisfies ProgressInput,
         persona,
       }),
-  });
-}
 
-export function useReportProgress() {
-  const { persona } = usePersona();
-  return useMutation({
-    mutationFn: ({ assetId, ...body }: { assetId: string } & ProgressInput) =>
-      api<void>(`/api/assets/${assetId}/progress`, { method: 'POST', body, persona }),
-  });
-}
+    complete: async (assetId, parts) => {
+      setAssetInCache(qc, await api<AssetDTO>(`/api/assets/${assetId}/complete`, {
+        method: 'POST',
+        body: { parts } satisfies CompleteInput,
+        persona,
+      }));
+    },
 
-export function useCompleteAsset() {
-  const qc = useQueryClient();
-  const { persona } = usePersona();
-  return useMutation({
-    mutationFn: ({ assetId, ...body }: { assetId: string } & CompleteInput) =>
-      api<AssetDTO>(`/api/assets/${assetId}/complete`, { method: 'POST', body, persona }),
-    onSuccess: (asset) => setAssetInCache(qc, asset),
-  });
+    // 204, no DTO: the server's terminal status (ABORTED or, for `'error'`,
+    // FAILED) comes back through the refetch and the SSE frame.
+    abort: async (assetId, reason) => {
+      await api<void>(`/api/assets/${assetId}/abort`, {
+        method: 'POST',
+        body: { reason } satisfies AbortInput,
+        persona,
+      });
+      await qc.invalidateQueries({ queryKey: keys.bootstrap });
+    },
+  };
 }

@@ -49,6 +49,18 @@ export const progressSchema = z.object({
 });
 export type ProgressInput = z.infer<typeof progressSchema>;
 
+/**
+ * Why a multipart upload is being abandoned. Both reasons abort the R2 upload;
+ * only the terminal status differs, so a part that failed every retry lands as
+ * FAILED (offering Retry, UI spec §7.6) instead of looking like a user abort.
+ * The body is optional on the wire — no body means a user abort.
+ */
+export const abortSchema = z.object({
+  reason: z.enum(['user', 'error']).default('user'),
+});
+export type AbortInput = z.infer<typeof abortSchema>;
+export type AbortReason = AbortInput['reason'];
+
 export const completeSchema = z.object({
   parts: z.array(z.object({ partNumber: z.number().int().min(1), etag: z.string().min(1) })).min(1),
 });
