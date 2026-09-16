@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  DRAFT
+  SUBMITTED
+  VENDOR_ACCEPTED
+  IN_PRODUCTION
+  READY_FOR_INSTALL
+  COMPLETED
+  CANCELLED
+}
+
+enum JobStatus {
+  OPEN
+  CLAIMED
+  ASSIGNED
+}
+
+enum AssetStatus {
+  PENDING
+  UPLOADING
+  UPLOADED
+  FAILED
+  ABORTED
+}
+
+enum SignType {
+  STOREFRONT
+  WAYFINDING
+  VEHICLE_WRAP
+  BANNER
+  MONUMENT
+}
+
+enum ActorType {
+  OPS
+  VENDOR
+  INSTALLER
+  SYSTEM
+}
+
+model Vendor {
+  id     String  @id @default(auto()) @map("_id") @db.ObjectId
+  name   String  @unique
+  orders Order[]
+}
+
+model Installer {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique
+}
+
+type Transition {
+  from      OrderStatus?
+  to        OrderStatus
+  actorType ActorType
+  actorId   String?
+  reason    String?
+  at        DateTime
+}
+
+model Order {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  orderNumber    String       @unique
+  title          String
+  customerName   String
+  signType       SignType
+  widthCm        Int
+  heightCm       Int
+  quantity       Int
+  installAddress String
+  dueDate        DateTime
+  notes          String?
+  vendorId       String       @db.ObjectId
+  vendor         Vendor       @relation(fields: [vendorId], references: [id])
+  status         OrderStatus  @default(DRAFT)
+  version        Int          @default(0)
+  history        Transition[]
+  assets         Asset[]
+  installJob     InstallJob?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  @@index([status])
+  @@index([vendorId, status])
+}
+
+type Claim {
+  installerId String   @db.ObjectId
+  claimedAt   DateTime
+  expiresAt   DateTime
+}
+
+model InstallJob {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderId     String    @unique @db.ObjectId
+  order       Order     @relation(fields: [orderId], references: [id])
+  status      JobStatus @default(OPEN)
+  claim       Claim?
+  installerId String?   @db.ObjectId
+  version     Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  @@index([status])
+}
+
+model Asset {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  orderId       String      @db.ObjectId
+  order         Order       @relation(fields: [orderId], references: [id])
+  fileName      String
+  contentType   String
+  sizeBytes     BigInt
+  storageKey    String
+  uploadId      String?
+  status        AssetStatus @default(PENDING)
+  bytesUploaded BigInt      @default(0)
+  progressPct   Int         @default(0)
+  simulated     Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  @@index([orderId])
+}
