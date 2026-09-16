@@ -13,6 +13,7 @@ Read these before changing behaviour. If code and spec disagree, fix one and say
 - `docs/superpowers/specs/2026-09-16-signcraft-architecture-design.md` — data model, API, locking, realtime, upload pipeline, folder layout.
 - `docs/superpowers/specs/2026-09-16-signcraft-decisions.md` — 17 ADRs with alternatives. Do not re-litigate a decision silently; add or amend an ADR.
 - `docs/superpowers/specs/2026-09-16-signcraft-ui-pages-and-flows.md` — every screen, state, and flow.
+- `docs/design/` — visual design from Claude Design: `DESIGN.md` (tokens) plus any exported screens. Use it for how things look; the UI spec wins on behaviour. Rebuild screens with Tailwind + Shadcn instead of pasting in exported HTML.
 
 ## Stack (mandated, do not swap)
 

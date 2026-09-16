@@ -5,6 +5,7 @@
 **Status:** Approved
 **Audience:** Stitch (screen design), then the implementer
 **Companion docs:** [Architecture](2026-09-16-signcraft-architecture-design.md) · [Decisions](2026-09-16-signcraft-decisions.md)
+**Visual design:** [docs/design](../../design/) ([DESIGN.md](../../design/DESIGN.md) tokens plus Claude Design exports). This document is the source of truth for behaviour; the design covers visuals only.
 
 This document describes every screen, component state, and user flow. It is deliberately implementation-agnostic so a designer can work from it; the component-to-Shadcn mapping at the end is for the implementer.
 

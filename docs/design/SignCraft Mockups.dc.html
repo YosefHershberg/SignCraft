@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"><style>*,*::before,*::after{box-sizing:border-box}body{margin:0;background:#e9ecf1;font-family:Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums}a{color:#0F766E}a:hover{color:#0d9488}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(15,23,42,.08)}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 Inter,system-ui,sans-serif;color:#0f172a}.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(15,23,42,.08);color:#0f172a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 Inter,system-ui,sans-serif;color:rgba(15,23,42,.55)}.dv-card{background:#fff;border:1px solid rgba(15,23,42,.1);border-radius:8px;box-shadow:0 1px 3px rgba(15,23,42,.08);overflow:hidden}.dv-opt:target .dv-oid{background:#0d9488;color:#fff}.dv-next{margin:26px 0 0;font:12px/1.6 Inter,system-ui,sans-serif;color:rgba(15,23,42,.5)}</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">SignCraft — screens from the UI spec §8 (SignCraft Control Room tokens)</span></div>
+<div class="dv-opts">
+
+<!-- ============ 1a — DESKTOP BOARD, OPS ============ -->
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Desktop dashboard · Ops · 1840×1040 · active upload + claimed job</div>
+<div class="dv-card" style="width:1840px">
+<div data-screen-label="01 Board — Ops" style="width:1840px;height:1040px;background:#F8FAFC;display:flex;flex-direction:column;overflow:hidden">
+
+  <div style="height:56px;flex:none;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:24px;padding:0 20px">
+    <div style="display:flex;align-items:baseline;gap:8px">
+      <span style="font-weight:700;font-size:16px;line-height:20px;font-family:Inter;letter-spacing:-.02em;color:#0F172A">SignCraft</span>
+      <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#94A3B8;white-space:nowrap">Ops console</span>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px">
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:9999px;background:#F1F5F9"><span style="width:6px;height:6px;border-radius:9999px;background:#64748B"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Draft 2</span></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:9999px;background:#F1F5F9"><span style="width:6px;height:6px;border-radius:9999px;background:#2563EB"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Submitted 1</span></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:9999px;background:#F1F5F9"><span style="width:6px;height:6px;border-radius:9999px;background:#4F46E5"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Accepted 2</span></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:9999px;background:#F1F5F9"><span style="width:6px;height:6px;border-radius:9999px;background:#D97706"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">In production 2</span></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:9999px;background:#F1F5F9"><span style="width:6px;height:6px;border-radius:9999px;background:#0D9488"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Ready 3</span></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:9999px;background:#F1F5F9"><span style="width:6px;height:6px;border-radius:9999px;background:#16A34A"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Completed 2</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:6px;height:6px;border-radius:9999px;background:#16A34A"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Live</span></div>
+      <div style="width:1px;height:24px;background:#E2E8F0"></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 8px 4px 4px;border:1px solid #E2E8F0;border-radius:8px">
+        <span style="width:24px;height:24px;border-radius:9999px;background:#CCFBF1;color:#0F766E;font-weight:600;font-size:10px;line-height:24px;font-family:Inter;text-align:center;white-space:nowrap">OP</span>
+        <span style="display:flex;flex-direction:column"><span style="font-weight:600;font-size:11px;line-height:13px;font-family:Inter;color:#0F172A;white-space:nowrap">Ops team</span><span style="font-weight:400;font-size:10px;line-height:13px;font-family:Inter;color:#94A3B8;white-space:nowrap">Ops</span></span>
+        <span style="font-weight:400;font-size:10px;line-height:10px;font-family:Inter;color:#94A3B8;white-space:nowrap">▾</span>
+      </div>
+      <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:7px 14px;border-radius:8px;cursor:pointer" style-hover="background:#0f766e">New order</button>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;padding:16px;display:flex;gap:12px;align-items:stretch">
+
+    <!-- Draft -->
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#64748B"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Draft</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">2</span></div>
+
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#64748B"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0045</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Vinyl · 12 pcs</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Cedar &amp; Co — Window decal set</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Vendor unassigned</span><span>Due 06 Oct</span></div>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-top:2px">
+            <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">print_v3.pdf</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#0F766E;white-space:nowrap">64%</span></div>
+            <div style="height:4px;border-radius:9999px;background:#E2E8F0;overflow:hidden"><div style="width:64%;height:100%;background:#0D9488"></div></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v1</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#64748B"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0044</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Monument · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Northwind Dental — Monument base</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Brightline Fab</span><span>Due 02 Oct</span></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v1</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submitted -->
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#2563EB"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Submitted</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">1</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden;outline:2px solid #0D9488;outline-offset:1px">
+        <div style="width:3px;flex:none;background:#2563EB"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0042</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Storefront · 3 pcs</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Riverside Bakery — Fascia sign</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Due 24 Sep</span></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v3</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+      <div style="font-weight:400;font-size:10px;line-height:14px;font-family:Inter;color:#94A3B8;text-align:center">just moved · highlight ring 600 ms</div>
+    </div>
+
+    <!-- Accepted -->
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#4F46E5"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Accepted</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">2</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#4F46E5"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0041</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Pylon · 2 pcs</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Grove Market — Pylon refacing</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Brightline Fab</span><span>Due 29 Sep</span></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v2</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#4F46E5"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0039</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Channel letters · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Halcyon Hotel — Lobby letters</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Due 21 Sep</span></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v2</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- In production -->
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#D97706"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">In production</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">2</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#D97706"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0038</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Wayfinding · 4 pcs</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Lakeshore Clinic — Directory panel</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Due 19 Sep</span></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v3</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#D97706"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0036</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Blade · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Otto's Garage — Blade sign</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Nordic Signworks</span><span>Due 18 Sep</span></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v4</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ready for install -->
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#0D9488"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Ready for install</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">3</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#0D9488"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0031</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Awning · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Pine Street Deli — Awning graphics</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Due 17 Sep</span></div>
+          <span style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;margin-top:2px;white-space:nowrap">Claimed · <span style="font-weight:600;font-size:11px;line-height:16px;font-family:'JetBrains Mono';white-space:nowrap">2:41</span></span>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v2</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#0D9488"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0033</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Plaque · 8 pcs</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Vertex Offices — Suite plaques</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Brightline Fab</span><span>Due 20 Sep</span></div>
+          <span style="align-self:flex-start;padding:2px 8px;border-radius:6px;background:#fff;border:1px solid #0D9488;color:#0F766E;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;margin-top:2px;white-space:nowrap">Open for installers</span>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v2</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#0D9488"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0034</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Blade · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Union Coffee — Projecting sign</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Nordic Signworks</span><span>Due 22 Sep</span></div>
+          <span style="align-self:flex-start;padding:2px 8px;border-radius:6px;background:#DCFCE7;color:#15803D;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;margin-top:2px">Assigned · Dana K.</span>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v3</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Completed -->
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#16A34A"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Completed</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">2</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden;opacity:.85">
+        <div style="width:3px;flex:none;background:#16A34A"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0028</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Post &amp; panel · 2 pcs</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Maple Grove Vet — Post &amp; panel</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Done 12 Sep</span></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v5</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden;opacity:.85">
+        <div style="width:3px;flex:none;background:#16A34A"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0025</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Wall wrap · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Atlas Gym — Wall wrap</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Nordic Signworks</span><span>Done 08 Sep</span></div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:2px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v6</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">⋯</span></div>
+        </div>
+      </div>
+      <div style="border:1px dashed #CBD5E1;border-radius:8px;padding:18px;text-align:center;font-weight:400;font-size:12px;line-height:16px;font-family:Inter;color:#94A3B8">Nothing here yet</div>
+    </div>
+
+    <!-- Cancelled rail -->
+    <div style="width:40px;flex:none;background:#F1F5F9;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0;cursor:pointer">
+      <span style="width:6px;height:6px;border-radius:9999px;background:#B91C1C;flex:none"></span>
+      <span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 5px;white-space:nowrap">1</span>
+      <span style="writing-mode:vertical-rl;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Cancelled</span>
+    </div>
+
+  </div>
+</div>
+</div></div>
+
+<!-- ============ 1b — DESKTOP BOARD, INSTALLER ============ -->
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Desktop dashboard · Installer (Dana K.) · non-actionable statuses collapsed to rails</div>
+<div class="dv-card" style="width:1840px">
+<div data-screen-label="02 Board — Installer" style="width:1840px;height:1040px;background:#F8FAFC;display:flex;flex-direction:column;overflow:hidden;position:relative">
+
+  <div style="height:56px;flex:none;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:24px;padding:0 20px">
+    <div style="display:flex;align-items:baseline;gap:8px"><span style="font-weight:700;font-size:16px;line-height:20px;font-family:Inter;letter-spacing:-.02em;color:#0F172A">SignCraft</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#94A3B8;white-space:nowrap">Installer console</span></div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px">
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:9999px;background:#F1F5F9"><span style="width:6px;height:6px;border-radius:9999px;background:#0D9488"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Ready 3</span></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:9999px;background:#F1F5F9"><span style="width:6px;height:6px;border-radius:9999px;background:#16A34A"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Completed 2</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:6px;height:6px;border-radius:9999px;background:#D97706"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569">Polling every 10 s</span></div>
+      <div style="width:1px;height:24px;background:#E2E8F0"></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 8px 4px 4px;border:1px solid #E2E8F0;border-radius:8px">
+        <span style="width:24px;height:24px;border-radius:9999px;background:#DBEAFE;color:#1D4ED8;font-weight:600;font-size:10px;line-height:24px;font-family:Inter;text-align:center;white-space:nowrap">DK</span>
+        <span style="display:flex;flex-direction:column"><span style="font-weight:600;font-size:11px;line-height:13px;font-family:Inter;color:#0F172A;white-space:nowrap">Dana K.</span><span style="font-weight:400;font-size:10px;line-height:13px;font-family:Inter;color:#94A3B8;white-space:nowrap">Installer</span></span>
+        <span style="font-weight:400;font-size:10px;line-height:10px;font-family:Inter;color:#94A3B8;white-space:nowrap">▾</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;padding:16px;display:flex;gap:12px;align-items:stretch">
+    <div style="width:40px;flex:none;background:#F1F5F9;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#64748B;flex:none"></span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 5px;white-space:nowrap">2</span><span style="writing-mode:vertical-rl;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Draft</span></div>
+    <div style="width:40px;flex:none;background:#F1F5F9;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#2563EB;flex:none"></span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 5px;white-space:nowrap">1</span><span style="writing-mode:vertical-rl;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Submitted</span></div>
+    <div style="width:40px;flex:none;background:#F1F5F9;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#4F46E5;flex:none"></span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 5px;white-space:nowrap">2</span><span style="writing-mode:vertical-rl;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Accepted</span></div>
+    <div style="width:40px;flex:none;background:#F1F5F9;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#D97706;flex:none"></span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 5px;white-space:nowrap">2</span><span style="writing-mode:vertical-rl;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">In production</span></div>
+
+    <div style="flex:1;min-width:0;background:#F1F5F9;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:9999px;background:#0D9488"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569">Ready for install · marketplace</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">3</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+          <div style="width:3px;flex:none;background:#0D9488"></div>
+          <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0033</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Plaque · 8 pcs</span></div>
+            <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Vertex Offices — Suite plaques</div>
+            <div style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">1180 Vertex Plaza, Floor 4 · Due 20 Sep</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+              <span style="padding:2px 8px;border-radius:6px;background:#fff;border:1px solid #0D9488;color:#0F766E;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Open for installers</span>
+              <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;padding:5px 12px;border-radius:8px;cursor:pointer;margin-left:auto;white-space:nowrap">Claim</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+          <div style="width:3px;flex:none;background:#0D9488"></div>
+          <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0031</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Awning · 1 pc</span></div>
+            <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Pine Street Deli — Awning graphics</div>
+            <div style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">44 Pine St · Due 17 Sep</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+              <span style="padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Your claim · <span style="font-weight:600;font-size:11px;line-height:16px;font-family:'JetBrains Mono';white-space:nowrap">2:41</span></span>
+              <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;padding:5px 12px;border-radius:8px;cursor:pointer;margin-left:auto;white-space:nowrap">Verify</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden;opacity:.85">
+          <div style="width:3px;flex:none;background:#0D9488"></div>
+          <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0034</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Blade · 1 pc</span></div>
+            <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Union Coffee — Projecting sign</div>
+            <div style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">9 Union Sq · Due 22 Sep</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+              <span style="padding:2px 8px;border-radius:6px;background:#DCFCE7;color:#15803D;font-weight:600;font-size:11px;line-height:16px;font-family:Inter">Assigned · Omar R.</span>
+              <button disabled="disabled" style="border:1px solid #E2E8F0;background:#F8FAFC;color:#94A3B8;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;padding:4px 12px;border-radius:8px;margin-left:auto;cursor:not-allowed;white-space:nowrap">Claim</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span style="width:6px;height:6px;border-radius:9999px;background:#16A34A"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569">Completed · your installs</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">2</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+          <div style="width:3px;flex:none;background:#16A34A"></div>
+          <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0028</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Post &amp; panel · 2 pcs</span></div>
+            <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Maple Grove Vet — Post &amp; panel</div>
+            <div style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Installed 12 Sep · Dana K.</div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+          <div style="width:3px;flex:none;background:#16A34A"></div>
+          <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0025</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Wall wrap · 1 pc</span></div>
+            <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Atlas Gym — Wall wrap</div>
+            <div style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Installed 08 Sep · Dana K.</div>
+          </div>
+        </div>
+        <div style="border:1px dashed #CBD5E1;border-radius:8px;padding:18px;text-align:center;font-weight:400;font-size:12px;line-height:16px;font-family:Inter;color:#94A3B8;display:flex;align-items:center;justify-content:center">No orders for you here</div>
+      </div>
+    </div>
+
+    <div style="width:40px;flex:none;background:#F1F5F9;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#B91C1C;flex:none"></span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 5px;white-space:nowrap">1</span><span style="writing-mode:vertical-rl;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Cancelled</span></div>
+  </div>
+
+  <div style="position:absolute;right:24px;bottom:24px;width:320px;background:#fff;border:1px solid #E2E8F0;border-left:3px solid #0D9488;border-radius:8px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:12px 14px;display:flex;flex-direction:column;gap:2px">
+    <span style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">A new job is open for installers</span>
+    <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">SC-0033 · Vertex Offices — Suite plaques</span>
+  </div>
+</div>
+</div></div>
+
+<!-- ============ 1c — DETAIL SHEET ============ -->
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Order detail sheet over the board · Ready for install · "Your claim · 2:41"</div>
+<div class="dv-card" style="width:1840px">
+<div data-screen-label="03 Detail sheet" style="width:1840px;height:1040px;background:#F8FAFC;display:flex;flex-direction:column;overflow:hidden;position:relative">
+
+  <div style="height:56px;flex:none;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:24px;padding:0 20px">
+    <div style="display:flex;align-items:baseline;gap:8px"><span style="font-weight:700;font-size:16px;line-height:20px;font-family:Inter;letter-spacing:-.02em;color:#0F172A">SignCraft</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#94A3B8;white-space:nowrap">Installer console</span></div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:6px;height:6px;border-radius:9999px;background:#16A34A"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Live</span></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 8px 4px 4px;border:1px solid #E2E8F0;border-radius:8px"><span style="width:24px;height:24px;border-radius:9999px;background:#DBEAFE;color:#1D4ED8;font-weight:600;font-size:10px;line-height:24px;font-family:Inter;text-align:center;white-space:nowrap">DK</span><span style="display:flex;flex-direction:column"><span style="font-weight:600;font-size:11px;line-height:13px;font-family:Inter;color:#0F172A;white-space:nowrap">Dana K.</span><span style="font-weight:400;font-size:10px;line-height:13px;font-family:Inter;color:#94A3B8;white-space:nowrap">Installer</span></span><span style="font-weight:400;font-size:10px;line-height:10px;font-family:Inter;color:#94A3B8;white-space:nowrap">▾</span></div>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="flex:1;min-width:0;padding:16px;display:flex;gap:12px;background:#F8FAFC">
+      <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#D97706"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">In production</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">2</span></div>
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;height:96px;opacity:.85"></div>
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;height:96px;opacity:.85"></div>
+      </div>
+      <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#0D9488"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Ready for install</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">3</span></div>
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden;outline:2px solid #0D9488;outline-offset:1px">
+          <div style="width:3px;flex:none;background:#0D9488"></div>
+          <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0031</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Awning · 1 pc</span></div>
+            <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Pine Street Deli — Awning graphics</div>
+            <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Due 17 Sep</span></div>
+            <span style="align-self:flex-start;padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;margin-top:2px;white-space:nowrap">Your claim · <span style="font-weight:600;font-size:11px;line-height:16px;font-family:'JetBrains Mono';white-space:nowrap">2:41</span> · Verify</span>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;height:110px;opacity:.85"></div>
+      </div>
+      <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#16A34A"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Completed</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">2</span></div>
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;height:88px;opacity:.85"></div>
+      </div>
+    </div>
+
+    <div style="width:520px;flex:none;position:relative">
+      <div style="position:absolute;inset:0;background:rgba(15,23,42,.35)"></div>
+      <div style="position:absolute;top:0;right:0;bottom:0;width:480px;background:#fff;border-radius:12px 0 0 12px;box-shadow:0 16px 40px rgba(15,23,42,.16);display:flex;flex-direction:column;overflow:hidden">
+
+        <div style="padding:16px;border-bottom:1px solid #E2E8F0;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#475569;white-space:nowrap">SC-0031</span>
+            <span style="padding:2px 8px;border-radius:6px;background:#CCFBF1;color:#0F766E;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Ready for install</span>
+            <span style="flex:1"></span>
+            <span style="font-weight:400;font-size:14px;line-height:14px;font-family:Inter;color:#94A3B8;cursor:pointer">✕</span>
+          </div>
+          <div style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Awning graphics</div>
+          <div style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569">Pine Street Deli</div>
+        </div>
+
+        <div style="padding:12px 16px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:8px">
+          <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:7px 14px;border-radius:8px;cursor:pointer">Verify claim</button>
+          <button style="border:1px solid #E2E8F0;background:#fff;color:#DC2626;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:7px 14px;border-radius:8px;cursor:pointer">Simulate failure</button>
+          <span style="flex:1"></span>
+          <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#94A3B8">Complete unlocks once assigned</span>
+        </div>
+
+        <div style="padding:16px;border-bottom:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px;background:#F8FAFC">
+          <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Install job</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Claimed</span>
+            <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Dana K. (you)</span>
+            <span style="flex:1"></span>
+            <span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#B45309;white-space:nowrap">2:41</span>
+          </div>
+          <div style="height:4px;border-radius:9999px;background:#E2E8F0;overflow:hidden"><div style="width:89%;height:100%;background:#D97706"></div></div>
+          <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Releases to the marketplace at 0:00 unless verified.</span>
+        </div>
+
+        <div style="padding:16px;border-bottom:1px solid #E2E8F0;display:grid;grid-template-columns:1fr 1fr;gap:12px 16px">
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Sign type</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Awning graphics</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Size</span><span style="font-weight:500;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A">240 × 90 cm</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Quantity</span><span style="font-weight:500;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">1</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Due date</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">17 Sep 2026</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Vendor</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Acme Signs</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Install address</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">44 Pine St, Unit B</span></div>
+          <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Notes</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569;text-wrap:pretty">Access through the rear alley before 9am. Scissor lift required; landlord approval on file.</span></div>
+        </div>
+
+        <div style="padding:16px;border-bottom:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center"><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Assets</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#94A3B8">3 files · 1.4 GB</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">awning_print_v3.pdf</span><span style="font-weight:500;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#64748B;white-space:nowrap">412 MB</span><span style="padding:1px 7px;border-radius:6px;background:#DCFCE7;color:#15803D;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Uploaded</span></div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">proof_sheet.tif</span><span style="font-weight:500;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F766E;white-space:nowrap">64%</span><span style="padding:1px 7px;border-radius:6px;background:#CCFBF1;color:#0F766E;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Uploading</span><span style="font-weight:400;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8;cursor:pointer">✕</span></div>
+            <div style="height:4px;border-radius:9999px;background:#E2E8F0;overflow:hidden"><div style="width:64%;height:100%;background:#0D9488"></div></div>
+            <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#94A3B8">655 MB of 1.02 GB · 28.4 MB/s · 13 s left</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#94A3B8;text-decoration:line-through">old_layout.ai</span><span style="font-weight:500;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">18 MB</span><span style="padding:1px 7px;border-radius:6px;background:#F1F5F9;color:#475569;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Aborted</span></div>
+        </div>
+
+        <div style="padding:16px;display:flex;flex-direction:column;gap:0">
+          <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;margin-bottom:10px;white-space:nowrap">History</span>
+          <div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="width:7px;height:7px;border-radius:9999px;background:#0D9488;margin-top:6px"></span><span style="flex:1;width:1px;background:#E2E8F0"></span></div><div style="padding-bottom:12px;display:flex;flex-direction:column"><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Marked ready for install · Acme Signs</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">Today 12:48</span></div></div>
+          <div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="width:7px;height:7px;border-radius:9999px;background:#D97706;margin-top:6px"></span><span style="flex:1;width:1px;background:#E2E8F0"></span></div><div style="padding-bottom:12px;display:flex;flex-direction:column"><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Production started · Acme Signs</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">Today 12:20</span></div></div>
+          <div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="width:7px;height:7px;border-radius:9999px;background:#4F46E5;margin-top:6px"></span><span style="flex:1;width:1px;background:#E2E8F0"></span></div><div style="padding-bottom:12px;display:flex;flex-direction:column"><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Accepted by Acme Signs</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">Today 12:08</span></div></div>
+          <div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center"><span style="width:7px;height:7px;border-radius:9999px;background:#2563EB;margin-top:6px"></span></div><div style="display:flex;flex-direction:column"><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Submitted by Ops team</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">Today 12:04</span></div></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</div></div>
+
+<!-- ============ 1d — VERIFICATION DIALOG ============ -->
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Verification dialog · 2:41 teal and 0:14 red terminal-warning variant</div>
+<div style="display:flex;gap:28px">
+<div class="dv-card" style="width:760px">
+<div data-screen-label="04a Verification 2:41" style="width:760px;height:620px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:440px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+    <div style="align-self:flex-start;display:flex;flex-direction:column;gap:4px">
+      <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Verify this job</span>
+      <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569">Verify identity and payment to lock in this job.</span>
+    </div>
+    <div style="position:relative;width:180px;height:180px;margin:4px 0">
+      <svg width="180" height="180" viewBox="0 0 180 180" style="display:block;transform:rotate(-90deg)">
+        <circle cx="90" cy="90" r="76" fill="none" stroke="#E2E8F0" stroke-width="8"></circle>
+        <circle cx="90" cy="90" r="76" fill="none" stroke="#0D9488" stroke-width="8" stroke-linecap="round" stroke-dasharray="425 478" ></circle>
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+        <span style="font-weight:500;font-size:40px;line-height:44px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">2:41</span>
+        <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">remaining</span>
+      </div>
+    </div>
+    <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;text-align:center;max-width:320px;text-wrap:pretty">You can close this dialog — the claim keeps counting down on the card and the chip reopens it.</span>
+    <div style="align-self:stretch;display:flex;align-items:center;gap:8px;margin-top:4px">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#DC2626;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Simulate failure</button>
+      <span style="flex:1"></span>
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Close</button>
+      <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:pointer">Verify</button>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dv-card" style="width:760px">
+<div data-screen-label="04b Verification 0:14" style="width:760px;height:620px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:440px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+    <div style="align-self:flex-start;display:flex;flex-direction:column;gap:4px">
+      <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Verify this job</span>
+      <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569">Verify identity and payment to lock in this job.</span>
+    </div>
+    <div style="position:relative;width:180px;height:180px;margin:4px 0">
+      <svg width="180" height="180" viewBox="0 0 180 180" style="display:block;transform:rotate(-90deg)">
+        <circle cx="90" cy="90" r="76" fill="none" stroke="#E2E8F0" stroke-width="8"></circle>
+        <circle cx="90" cy="90" r="76" fill="none" stroke="#DC2626" stroke-width="8" stroke-linecap="round" stroke-dasharray="37 478"></circle>
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+        <span style="font-weight:500;font-size:40px;line-height:44px;font-family:'JetBrains Mono';color:#DC2626;white-space:nowrap">0:14</span>
+        <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#DC2626;white-space:nowrap">releasing soon</span>
+      </div>
+    </div>
+    <div style="align-self:stretch;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 12px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#991B1B">At 0:00 the job returns to the marketplace and any installer can claim it.</div>
+    <div style="align-self:stretch;display:flex;align-items:center;gap:8px;margin-top:4px">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#DC2626;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Simulate failure</button>
+      <span style="flex:1"></span>
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Close</button>
+      <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:pointer">Verify</button>
+    </div>
+  </div>
+</div>
+</div>
+</div></div>
+
+<!-- ============ 1e — CREATE ORDER ============ -->
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Create order dialog (Ops) · inline blur validation</div>
+<div class="dv-card" style="width:900px">
+<div data-screen-label="05 Create order" style="width:900px;height:860px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:560px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">New order</span>
+      <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569">Creates a draft. Files can be uploaded before submitting to a vendor.</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Title</span>
+      <div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Fascia sign — front elevation</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Customer name</span>
+      <div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Riverside Bakery</div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Sign type</span><div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A"><span style="flex:1">Storefront fascia</span><span style="font-weight:400;font-size:10px;line-height:10px;font-family:Inter;color:#94A3B8;white-space:nowrap">▾</span></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Width cm</span><div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;font-weight:500;font-size:13px;line-height:20px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">360</div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Height cm</span><div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;font-weight:500;font-size:13px;line-height:20px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">80</div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Qty</span><div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;font-weight:500;font-size:13px;line-height:20px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">3</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Vendor</span><div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A"><span style="flex:1">Acme Signs</span><span style="font-weight:400;font-size:10px;line-height:10px;font-family:Inter;color:#94A3B8;white-space:nowrap">▾</span></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Due date</span><div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A"><span style="flex:1">24 Sep 2026</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#94A3B8;white-space:nowrap">▦</span></div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Install address</span>
+      <div style="border:1px solid #DC2626;border-radius:8px;padding:8px 10px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#94A3B8">Street, city, postcode</div>
+      <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#DC2626">Install address is required.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Notes <span style="color:#94A3B8;font-weight:400;text-transform:none;letter-spacing:0">optional</span></span>
+      <div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;height:64px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Match Pantone 7462C. Existing brackets stay.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Cancel</button>
+      <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:pointer">Create draft</button>
+    </div>
+  </div>
+</div>
+</div></div>
+
+<!-- ============ 1f — TRANSITION DIALOGS ============ -->
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Transition dialog with inline 400 · cancel (destructive) · claim 409 · simulate upload</div>
+<div style="display:flex;flex-wrap:wrap;gap:28px;width:1120px">
+
+<div class="dv-card" style="width:540px">
+<div data-screen-label="06a Transition 400" style="width:540px;height:460px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:440px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Move order</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="padding:2px 8px;border-radius:6px;background:#F1F5F9;color:#475569;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Draft</span>
+      <span style="font-weight:400;font-size:13px;line-height:18px;font-family:Inter;color:#94A3B8">→</span>
+      <span style="padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">In production</span>
+    </div>
+    <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569">The vendor will be notified.</span>
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#991B1B">Cannot move Draft to In production</span>
+      <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#991B1B">Allowed from Draft: Submitted, Cancelled.</span>
+      <span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#B91C1C;white-space:nowrap">INVALID_TRANSITION · 400</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Back</button>
+      <button disabled="disabled" style="border:none;background:#CBD5E1;color:#F8FAFC;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:not-allowed">Confirm</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="dv-card" style="width:540px">
+<div data-screen-label="06b Cancel order" style="width:540px;height:460px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:440px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Cancel SC-0042?</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="padding:2px 8px;border-radius:6px;background:#DBEAFE;color:#1D4ED8;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Submitted</span>
+      <span style="font-weight:400;font-size:13px;line-height:18px;font-family:Inter;color:#94A3B8">→</span>
+      <span style="padding:2px 8px;border-radius:6px;background:#FEE2E2;color:#991B1B;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Cancelled</span>
+    </div>
+    <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569;text-wrap:pretty">Orders cannot be cancelled once production starts. This one is still in Submitted, so cancelling is allowed.</span>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Reason <span style="color:#DC2626">required</span></span>
+      <div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;height:56px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#94A3B8">Why is this order being cancelled?</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Back</button>
+      <button style="border:none;background:#DC2626;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:pointer">Cancel order</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="dv-card" style="width:540px">
+<div data-screen-label="06c Claim 409" style="width:540px;height:400px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:420px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Claim this job?</span>
+    <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569;text-wrap:pretty">You'll have 3 minutes to verify your identity and payment details, otherwise it returns to the marketplace.</span>
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#991B1B">Another installer claimed this job a moment ago.</span>
+      <span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#B91C1C;white-space:nowrap">CLAIM_TAKEN · 409</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px">
+      <span style="padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter">Claimed · Dana K. · <span style="font-weight:600;font-size:11px;line-height:16px;font-family:'JetBrains Mono';white-space:nowrap">2:59</span></span>
+      <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap">Releases unless verified</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Back</button>
+      <button disabled="disabled" style="border:none;background:#CBD5E1;color:#F8FAFC;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:not-allowed">Claim</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="dv-card" style="width:540px">
+<div data-screen-label="06d Simulate upload" style="width:540px;height:400px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:420px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Simulate large file</span>
+    <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569;text-wrap:pretty">Generates a synthetic file in the browser and uploads it through the same presigned multipart pipeline. No real file needed.</span>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><span style="width:14px;height:14px;border-radius:9999px;border:1px solid #CBD5E1"></span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">100 MB</span></div>
+      <div style="display:flex;align-items:center;gap:10px;border:1px solid #0D9488;background:#F0FDFA;border-radius:8px;padding:10px 12px"><span style="width:14px;height:14px;border-radius:9999px;border:4px solid #0D9488"></span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">1 GB</span><span style="margin-left:auto;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#0F766E">≈ 36 s at 28 MB/s</span></div>
+      <div style="display:flex;align-items:center;gap:10px;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><span style="width:14px;height:14px;border-radius:9999px;border:1px solid #CBD5E1"></span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">2 GB</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Back</button>
+      <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:pointer">Start</button>
+    </div>
+  </div>
+</div>
+</div>
+
+</div></div>
+
+<!-- ============ 1g — MOBILE ============ -->
+<div class="dv-opt" id="1g"><div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Mobile · status pill tabs, card list + FAB · full-screen detail sheet · 390×844</div>
+<div style="display:flex;gap:28px">
+
+<div class="dv-card" style="width:390px">
+<div data-screen-label="07a Mobile board" style="width:390px;height:844px;background:#F8FAFC;display:flex;flex-direction:column;overflow:hidden;position:relative">
+  <div style="height:56px;flex:none;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;padding:0 14px">
+    <span style="font-weight:700;font-size:16px;line-height:20px;font-family:Inter;letter-spacing:-.02em;color:#0F172A">SignCraft</span>
+    <span style="flex:1"></span>
+    <span style="width:6px;height:6px;border-radius:9999px;background:#16A34A"></span>
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border:1px solid #E2E8F0;border-radius:8px"><span style="width:22px;height:22px;border-radius:9999px;background:#CCFBF1;color:#0F766E;font-weight:600;font-size:9px;line-height:22px;font-family:Inter;text-align:center">OP</span><span style="font-weight:600;font-size:11px;line-height:13px;font-family:Inter;color:#0F172A;white-space:nowrap">Ops</span><span style="font-weight:400;font-size:10px;line-height:10px;font-family:Inter;color:#94A3B8;white-space:nowrap">▾</span></div>
+  </div>
+
+  <div style="flex:none;background:#fff;border-bottom:1px solid #E2E8F0;padding:10px 14px;display:flex;gap:8px;overflow:hidden">
+    <span style="flex:none;padding:5px 11px;border-radius:9999px;background:#0F172A;color:#fff;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Draft 2</span>
+    <span style="flex:none;padding:5px 11px;border-radius:9999px;background:#F1F5F9;color:#475569;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Submitted 1</span>
+    <span style="flex:none;padding:5px 11px;border-radius:9999px;background:#F1F5F9;color:#475569;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Accepted 2</span>
+    <span style="flex:none;padding:5px 11px;border-radius:9999px;background:#F1F5F9;color:#475569;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">In prod</span>
+  </div>
+
+  <div style="flex:1;min-height:0;padding:14px;display:flex;flex-direction:column;gap:12px">
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+      <div style="width:3px;flex:none;background:#64748B"></div>
+      <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0045</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Vinyl · 12 pcs</span></div>
+        <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Cedar &amp; Co — Window decal set</div>
+        <div style="display:flex;flex-wrap:wrap;gap:2px 10px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Vendor unassigned</span><span>Due 06 Oct</span></div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:2px">
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">print_v3.pdf</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#0F766E;white-space:nowrap">64%</span></div>
+          <div style="height:4px;border-radius:9999px;background:#E2E8F0;overflow:hidden"><div style="width:64%;height:100%;background:#0D9488"></div></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v1</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8">⋯</span></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+      <div style="width:3px;flex:none;background:#64748B"></div>
+      <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0044</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Monument · 1 pc</span></div>
+        <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Northwind Dental — Monument base</div>
+        <div style="display:flex;flex-wrap:wrap;gap:2px 10px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Brightline Fab</span><span>Due 02 Oct</span></div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px"><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v1</span><span style="font-weight:600;font-size:12px;line-height:12px;font-family:Inter;color:#94A3B8">⋯</span></div>
+      </div>
+    </div>
+    <div style="border:1px dashed #CBD5E1;border-radius:8px;padding:20px;text-align:center;font-weight:400;font-size:12px;line-height:16px;font-family:Inter;color:#94A3B8">Nothing else in Draft</div>
+  </div>
+
+  <div style="position:absolute;right:16px;bottom:20px;width:52px;height:52px;border-radius:9999px;background:#0D9488;box-shadow:0 16px 40px rgba(15,23,42,.16);color:#fff;font-weight:400;font-size:26px;line-height:52px;font-family:Inter;text-align:center">＋</div>
+</div>
+</div>
+
+<div class="dv-card" style="width:390px">
+<div data-screen-label="07b Mobile detail" style="width:390px;height:844px;background:#fff;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:none;padding:14px;border-bottom:1px solid #E2E8F0;display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-weight:400;font-size:14px;line-height:14px;font-family:Inter;color:#94A3B8">✕</span>
+      <span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#475569;white-space:nowrap">SC-0031</span>
+      <span style="padding:2px 8px;border-radius:6px;background:#CCFBF1;color:#0F766E;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Ready for install</span>
+    </div>
+    <div style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Awning graphics</div>
+    <div style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569">Pine Street Deli</div>
+  </div>
+  <div style="flex:none;padding:12px 14px;border-bottom:1px solid #E2E8F0;display:flex;gap:8px">
+    <button style="flex:1;border:none;background:#0D9488;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:11px 14px;border-radius:8px;cursor:pointer">Verify claim</button>
+    <button style="flex:none;border:1px solid #E2E8F0;background:#fff;color:#DC2626;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:11px 14px;border-radius:8px;cursor:pointer">Release</button>
+  </div>
+  <div style="flex:none;padding:14px;border-bottom:1px solid #E2E8F0;background:#F8FAFC;display:flex;flex-direction:column;gap:8px">
+    <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Install job</span>
+    <div style="display:flex;align-items:center;gap:10px"><span style="padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Claimed</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">You</span><span style="flex:1"></span><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#B45309;white-space:nowrap">2:41</span></div>
+    <div style="height:4px;border-radius:9999px;background:#E2E8F0;overflow:hidden"><div style="width:89%;height:100%;background:#D97706"></div></div>
+  </div>
+  <div style="flex:none;padding:14px;border-bottom:1px solid #E2E8F0;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Size</span><span style="font-weight:500;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A">240 × 90 cm</span></div>
+    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Quantity</span><span style="font-weight:500;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">1</span></div>
+    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Vendor</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Acme Signs</span></div>
+    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Due</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">17 Sep</span></div>
+    <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#94A3B8;white-space:nowrap">Install address</span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">44 Pine St, Unit B</span></div>
+  </div>
+  <div style="flex:none;padding:14px;border-bottom:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px">
+    <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Assets</span>
+    <div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">awning_print_v3.pdf</span><span style="padding:1px 7px;border-radius:6px;background:#DCFCE7;color:#15803D;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Uploaded</span></div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">proof_sheet.tif</span><span style="font-weight:500;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F766E;white-space:nowrap">64%</span></div>
+      <div style="height:4px;border-radius:9999px;background:#E2E8F0;overflow:hidden"><div style="width:64%;height:100%;background:#0D9488"></div></div>
+    </div>
+  </div>
+  <div style="flex:1;min-height:0;padding:14px;display:flex;flex-direction:column">
+    <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;margin-bottom:10px;white-space:nowrap">History</span>
+    <div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center"><span style="width:7px;height:7px;border-radius:9999px;background:#0D9488;margin-top:6px"></span><span style="flex:1;width:1px;background:#E2E8F0"></span></div><div style="padding-bottom:12px;display:flex;flex-direction:column"><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Marked ready · Acme Signs</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">12:48</span></div></div>
+    <div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center"><span style="width:7px;height:7px;border-radius:9999px;background:#D97706;margin-top:6px"></span><span style="flex:1;width:1px;background:#E2E8F0"></span></div><div style="padding-bottom:12px;display:flex;flex-direction:column"><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Production started</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">12:20</span></div></div>
+    <div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center"><span style="width:7px;height:7px;border-radius:9999px;background:#2563EB;margin-top:6px"></span></div><div style="display:flex;flex-direction:column"><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">Submitted by Ops team</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">12:04</span></div></div>
+  </div>
+</div>
+</div>
+
+</div></div>
+
+<!-- ============ 1h — TABLET ============ -->
+<div class="dv-opt" id="1h"><div class="dv-olabel"><a class="dv-oid" href="#1h">1h</a>Tablet 1024×768 · mid-scroll, ~2.5 columns with scroll-snap</div>
+<div class="dv-card" style="width:1024px">
+<div data-screen-label="08 Tablet board" style="width:1024px;height:768px;background:#F8FAFC;display:flex;flex-direction:column;overflow:hidden">
+  <div style="height:56px;flex:none;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px;padding:0 16px">
+    <div style="display:flex;align-items:baseline;gap:8px"><span style="font-weight:700;font-size:16px;line-height:20px;font-family:Inter;letter-spacing:-.02em;color:#0F172A">SignCraft</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#94A3B8">Vendor · Acme Signs</span></div>
+    <span style="flex:1"></span>
+    <div style="display:flex;align-items:center;gap:7px"><span style="width:6px;height:6px;border-radius:9999px;background:#D97706"></span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#475569;white-space:nowrap">Reconnecting…</span></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 8px 4px 4px;border:1px solid #E2E8F0;border-radius:8px"><span style="width:24px;height:24px;border-radius:9999px;background:#E0E7FF;color:#4338CA;font-weight:600;font-size:10px;line-height:24px;font-family:Inter;text-align:center;white-space:nowrap">AS</span><span style="display:flex;flex-direction:column"><span style="font-weight:600;font-size:11px;line-height:13px;font-family:Inter;color:#0F172A;white-space:nowrap">Acme Signs</span><span style="font-weight:400;font-size:10px;line-height:13px;font-family:Inter;color:#94A3B8;white-space:nowrap">Vendor</span></span><span style="font-weight:400;font-size:10px;line-height:10px;font-family:Inter;color:#94A3B8;white-space:nowrap">▾</span></div>
+  </div>
+
+  <div style="flex:1;min-height:0;padding:16px;display:flex;gap:12px;align-items:stretch;overflow:hidden">
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px;margin-left:-150px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#2563EB"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Submitted</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">1</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#2563EB"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0042</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Storefront · 3 pcs</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Riverside Bakery — Fascia sign</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Due 24 Sep</span></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:2px"><button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;padding:5px 12px;border-radius:8px;cursor:pointer;white-space:nowrap">Accept</button><button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;padding:4px 12px;border-radius:8px;cursor:pointer;white-space:nowrap">Cancel</button><span style="flex:1"></span><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v3</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#4F46E5"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Accepted</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">1</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#4F46E5"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0039</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Channel letters · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Halcyon Hotel — Lobby letters</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Due 21 Sep</span></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:2px"><button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;padding:5px 12px;border-radius:8px;cursor:pointer;white-space:nowrap">Start production</button><span style="flex:1"></span><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v2</span></div>
+        </div>
+      </div>
+      <div style="border:1px dashed #CBD5E1;border-radius:8px;padding:18px;text-align:center;font-weight:400;font-size:12px;line-height:16px;font-family:Inter;color:#94A3B8">Nothing here yet</div>
+    </div>
+
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#D97706"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">In production</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">2</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden">
+        <div style="width:3px;flex:none;background:#D97706"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0038</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Wayfinding · 4 pcs</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Lakeshore Clinic — Directory panel</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Acme Signs</span><span>Due 19 Sep</span></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:2px"><button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;padding:5px 12px;border-radius:8px;cursor:pointer;white-space:nowrap">Mark ready</button><span style="flex:1"></span><span style="font-weight:500;font-size:10px;line-height:14px;font-family:'JetBrains Mono';color:#94A3B8;white-space:nowrap">v3</span></div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden;opacity:.85">
+        <div style="width:3px;flex:none;background:#D97706"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0036</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Blade · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Otto's Garage — Blade sign</div>
+          <div style="display:flex;justify-content:space-between;gap:8px;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap"><span>Nordic Signworks</span><span>Due 18 Sep</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:280px;flex:none;background:#F1F5F9;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 0"><span style="width:6px;height:6px;border-radius:9999px;background:#0D9488"></span><span style="flex:1;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Ready for install</span><span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#475569;background:#E2E8F0;border-radius:6px;padding:0 6px;white-space:nowrap">3</span></div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);display:flex;overflow:hidden;opacity:.85">
+        <div style="width:3px;flex:none;background:#0D9488"></div>
+        <div style="flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;white-space:nowrap"><span style="font-weight:600;font-size:13px;line-height:18px;font-family:'JetBrains Mono';color:#0F172A;white-space:nowrap">SC-0031</span><span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B">Awning · 1 pc</span></div>
+          <div style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#0F172A">Pine Street Deli — Awning graphics</div>
+          <span style="align-self:flex-start;padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Claimed · <span style="font-weight:600;font-size:11px;line-height:16px;font-family:'JetBrains Mono';white-space:nowrap">2:41</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:none;height:26px;display:flex;align-items:center;justify-content:center;gap:5px;background:#F8FAFC">
+    <span style="width:18px;height:3px;border-radius:9999px;background:#CBD5E1"></span>
+    <span style="width:34px;height:3px;border-radius:9999px;background:#94A3B8"></span>
+    <span style="width:18px;height:3px;border-radius:9999px;background:#CBD5E1"></span>
+  </div>
+</div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "make <a class="dv-oid" href="#1a">1a</a> a working prototype with the live countdown and card motion" · "add the dark theme variant of <a class="dv-oid" href="#1a">1a</a>" · "show the double-claim race across two tabs side by side"</p>
+</section>
+
+</x-dc>
+</body>
+</html>

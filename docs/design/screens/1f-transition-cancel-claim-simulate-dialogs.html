@@ -1,0 +1,96 @@
+<!-- 1fTransition dialog with inline 400 · cancel (destructive) · claim 409 · simulate upload -->
+<!-- Extracted from SignCraft Mockups.dc.html (Claude Design). Inline styles are the visual spec; rebuild with Tailwind + Shadcn. -->
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Transition dialog with inline 400 · cancel (destructive) · claim 409 · simulate upload</div>
+<div style="display:flex;flex-wrap:wrap;gap:28px;width:1120px">
+
+<div class="dv-card" style="width:540px">
+<div data-screen-label="06a Transition 400" style="width:540px;height:460px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:440px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Move order</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="padding:2px 8px;border-radius:6px;background:#F1F5F9;color:#475569;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Draft</span>
+      <span style="font-weight:400;font-size:13px;line-height:18px;font-family:Inter;color:#94A3B8">→</span>
+      <span style="padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">In production</span>
+    </div>
+    <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569">The vendor will be notified.</span>
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#991B1B">Cannot move Draft to In production</span>
+      <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#991B1B">Allowed from Draft: Submitted, Cancelled.</span>
+      <span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#B91C1C;white-space:nowrap">INVALID_TRANSITION · 400</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Back</button>
+      <button disabled="disabled" style="border:none;background:#CBD5E1;color:#F8FAFC;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:not-allowed">Confirm</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="dv-card" style="width:540px">
+<div data-screen-label="06b Cancel order" style="width:540px;height:460px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:440px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Cancel SC-0042?</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="padding:2px 8px;border-radius:6px;background:#DBEAFE;color:#1D4ED8;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Submitted</span>
+      <span style="font-weight:400;font-size:13px;line-height:18px;font-family:Inter;color:#94A3B8">→</span>
+      <span style="padding:2px 8px;border-radius:6px;background:#FEE2E2;color:#991B1B;font-weight:600;font-size:11px;line-height:16px;font-family:Inter;white-space:nowrap">Cancelled</span>
+    </div>
+    <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569;text-wrap:pretty">Orders cannot be cancelled once production starts. This one is still in Submitted, so cancelling is allowed.</span>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:11px;line-height:16px;font-family:Inter;letter-spacing:.04em;text-transform:uppercase;color:#475569;white-space:nowrap">Reason <span style="color:#DC2626">required</span></span>
+      <div style="border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;height:56px;font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#94A3B8">Why is this order being cancelled?</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Back</button>
+      <button style="border:none;background:#DC2626;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:pointer">Cancel order</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="dv-card" style="width:540px">
+<div data-screen-label="06c Claim 409" style="width:540px;height:400px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:420px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Claim this job?</span>
+    <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569;text-wrap:pretty">You'll have 3 minutes to verify your identity and payment details, otherwise it returns to the marketplace.</span>
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600;font-size:13px;line-height:18px;font-family:Inter;color:#991B1B">Another installer claimed this job a moment ago.</span>
+      <span style="font-weight:500;font-size:11px;line-height:16px;font-family:'JetBrains Mono';color:#B91C1C;white-space:nowrap">CLAIM_TAKEN · 409</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px">
+      <span style="padding:2px 8px;border-radius:6px;background:#FEF3C7;color:#B45309;font-weight:600;font-size:11px;line-height:16px;font-family:Inter">Claimed · Dana K. · <span style="font-weight:600;font-size:11px;line-height:16px;font-family:'JetBrains Mono';white-space:nowrap">2:59</span></span>
+      <span style="font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#64748B;white-space:nowrap">Releases unless verified</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Back</button>
+      <button disabled="disabled" style="border:none;background:#CBD5E1;color:#F8FAFC;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:not-allowed">Claim</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="dv-card" style="width:540px">
+<div data-screen-label="06d Simulate upload" style="width:540px;height:400px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
+  <div style="position:relative;width:420px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.16);padding:24px;display:flex;flex-direction:column;gap:16px">
+    <span style="font-weight:600;font-size:20px;line-height:28px;font-family:Inter;letter-spacing:-.01em;color:#0F172A">Simulate large file</span>
+    <span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#475569;text-wrap:pretty">Generates a synthetic file in the browser and uploads it through the same presigned multipart pipeline. No real file needed.</span>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><span style="width:14px;height:14px;border-radius:9999px;border:1px solid #CBD5E1"></span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">100 MB</span></div>
+      <div style="display:flex;align-items:center;gap:10px;border:1px solid #0D9488;background:#F0FDFA;border-radius:8px;padding:10px 12px"><span style="width:14px;height:14px;border-radius:9999px;border:4px solid #0D9488"></span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">1 GB</span><span style="margin-left:auto;font-weight:400;font-size:11px;line-height:16px;font-family:Inter;color:#0F766E">≈ 36 s at 28 MB/s</span></div>
+      <div style="display:flex;align-items:center;gap:10px;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><span style="width:14px;height:14px;border-radius:9999px;border:1px solid #CBD5E1"></span><span style="font-weight:400;font-size:14px;line-height:20px;font-family:Inter;color:#0F172A">2 GB</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+      <button style="border:1px solid #E2E8F0;background:#fff;color:#475569;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 14px;border-radius:8px;cursor:pointer">Back</button>
+      <button style="border:none;background:#0D9488;color:#fff;font-weight:600;font-size:13px;line-height:18px;font-family:Inter;padding:9px 18px;border-radius:8px;cursor:pointer">Start</button>
+    </div>
+  </div>
+</div>
+</div>
+
+</div></div>
+
+<!-- ============ 1g — MOBILE ============ -->
