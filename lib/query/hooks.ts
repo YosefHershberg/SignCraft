@@ -126,9 +126,12 @@ export function useVerify() {
   });
 }
 
-/** Wire shape of `POST /api/assets` (architecture spec §8) — not an AssetDTO. */
+/**
+ * Wire shape of `POST /api/assets` (`lib/services/assets.ts`) — the created
+ * asset plus the multipart parameters the uploader needs. Not an AssetDTO.
+ */
 export interface CreateAssetResult {
-  assetId: string;
+  asset: AssetDTO;
   uploadId: string;
   partSize: number;
   partCount: number;
@@ -140,6 +143,9 @@ export function useCreateAsset() {
   return useMutation({
     mutationFn: (input: CreateAssetInput) =>
       api<CreateAssetResult>('/api/assets', { method: 'POST', body: input, persona }),
+    // Seeds the row into the cache at once, so the asset appears at 0% before
+    // the first part is presigned rather than waiting for the SSE frame.
+    onSuccess: ({ asset }) => setAssetInCache(qc, asset),
     onError: (err) => invalidateOn409(qc, err),
   });
 }
