@@ -52,15 +52,20 @@ export async function seed() {
     // For a CANCELLED order, the chain history runs up to `cancelledFrom`, then a CANCELLED
     // entry is appended below — CANCELLED itself is not part of CHAIN.
     const idx = CHAIN.indexOf(o.cancelledFrom ?? o.status);
-    const history: { from: OrderStatus | null; to: OrderStatus; actorType: 'OPS' | 'VENDOR' | 'INSTALLER' | 'SYSTEM'; actorId: null; reason: string | null; at: Date }[] =
-      CHAIN.slice(0, idx + 1).map((to, i) => ({
-        from: i === 0 ? null : CHAIN[i - 1],
-        to,
-        actorType: i === 0 ? 'SYSTEM' : i === 1 ? 'OPS' : i === 5 ? 'INSTALLER' : 'VENDOR',
-        actorId: null,
-        reason: null,
-        at: new Date(now - (idx - i + 1) * 3_600_000),
-      }));
+    const vendorId = vendors.get(o.vendor)!;
+    const installerId = installers.get('Dana K.')!;
+    const history: { from: OrderStatus | null; to: OrderStatus; actorType: 'OPS' | 'VENDOR' | 'INSTALLER' | 'SYSTEM'; actorId: string | null; reason: string | null; at: Date }[] =
+      CHAIN.slice(0, idx + 1).map((to, i) => {
+        const actorType = i === 0 ? 'SYSTEM' : i === 1 ? 'OPS' : i === 5 ? 'INSTALLER' : 'VENDOR';
+        return {
+          from: i === 0 ? null : CHAIN[i - 1],
+          to,
+          actorType,
+          actorId: actorType === 'VENDOR' ? vendorId : actorType === 'INSTALLER' ? installerId : null,
+          reason: null,
+          at: new Date(now - (idx - i + 1) * 3_600_000),
+        };
+      });
     if (o.cancelledFrom) {
       history.push({
         from: o.cancelledFrom,
@@ -84,7 +89,7 @@ export async function seed() {
         installAddress: o.address,
         dueDate: new Date(now + o.dueIn * DAY),
         notes: o.notes ?? null,
-        vendorId: vendors.get(o.vendor)!,
+        vendorId,
         status: o.status,
         version,
         history,
@@ -108,7 +113,7 @@ export async function seed() {
       await prisma.installJob.create({ data: { orderId: order.id, status: 'OPEN' } });
     }
     if (o.status === 'COMPLETED') {
-      await prisma.installJob.create({ data: { orderId: order.id, status: 'ASSIGNED', installerId: installers.get('Dana K.')! } });
+      await prisma.installJob.create({ data: { orderId: order.id, status: 'ASSIGNED', installerId } });
     }
   }
   // one DRAFT with an uploaded asset (SC-0002) so Submit is demonstrable immediately
