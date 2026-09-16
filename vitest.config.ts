@@ -14,9 +14,12 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
-          include: ['tests/unit/**/*.test.ts'],
+          include: ['tests/unit/**/*.test.{ts,tsx}'],
           environment: 'node',
         },
+        // tsconfig.json keeps Next's `jsx: "preserve"`, so esbuild needs to be
+        // told how to compile the .tsx component tests.
+        esbuild: { jsx: 'automatic' },
         resolve: { alias },
       },
       {

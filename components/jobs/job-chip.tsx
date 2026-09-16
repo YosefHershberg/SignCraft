@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { toPublicJob } from '@/lib/domain/claims';
 import type { InstallerDTO, JobDTO, Persona } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
@@ -25,10 +26,24 @@ export function JobChip({
   installers: InstallerDTO[];
   now: number;
   onVerify?: (job: JobDTO) => void;
-  onExpire?: () => void;
+  /** Called once per claim when it lapses; `key` is `<jobId>:<expiresAt>`. */
+  onExpire?: (key: string) => void;
 }) {
   const pub = toPublicJob(job, new Date(now));
   const nameOf = (id: string | null) => (id ? installers.find((i) => i.id === id)?.name : undefined);
+
+  // The expiry edge has to be read here, not inside ClaimCountdown: the moment
+  // the claim lapses `toPublicJob` already reports OPEN, so the countdown is
+  // unmounted and could never fire from its own tick. Comparing the raw job
+  // against its public view catches exactly that transition, once per claim.
+  const expiryKey = job.status === 'CLAIMED' && pub.status === 'OPEN' && job.claim ? `${job.id}:${job.claim.expiresAt}` : null;
+  const firedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!expiryKey || firedFor.current === expiryKey) return;
+    firedFor.current = expiryKey;
+    onExpire?.(expiryKey);
+  }, [expiryKey, onExpire]);
 
   if (pub.status === 'ASSIGNED') {
     const name = nameOf(pub.installerId);
@@ -37,7 +52,7 @@ export function JobChip({
 
   if (pub.status === 'CLAIMED' && pub.claim) {
     const mine = persona.kind === 'installer' && pub.claim.installerId === persona.id;
-    const countdown = <ClaimCountdown expiresAt={pub.claim.expiresAt} now={now} onExpire={onExpire} />;
+    const countdown = <ClaimCountdown expiresAt={pub.claim.expiresAt} now={now} />;
 
     if (mine) {
       return (

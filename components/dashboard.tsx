@@ -15,6 +15,9 @@ import type { BootstrapDTO, OrderStatus, Persona } from '@/lib/domain/types';
 /** How long a card keeps its highlight ring after moving column (UI spec §4.2). */
 const HIGHLIGHT_MS = 600;
 
+/** Stable identity so the decay effect below does not re-arm on every render. */
+const NO_HIGHLIGHT: ReadonlySet<string> = new Set();
+
 /**
  * App shell entry point. `Providers` needs `initialPersona` (only available
  * here, from the server-rendered cookie) so it wraps the interactive board
@@ -37,14 +40,24 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
 
   const board = data ?? initialData;
   const now = useNow(Date.parse(board.serverTime));
-  const highlightId = useStatusHighlight(board);
+  const highlightIds = useStatusHighlight(board);
+  const expiredClaims = useRef(new Set<string>());
 
   const vendorNames = Object.fromEntries(board.vendors.map((v) => [v.id, v.name]));
 
-  /** A claim countdown hit zero: refetch so the server's lazy expiry reconciles. */
-  const onClaimExpired = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: keys.bootstrap });
-  }, [queryClient]);
+  /**
+   * A claim lapsed: refetch so the server's lazy expiry reconciles. The mobile
+   * and desktop trees are both mounted, so the same claim reports twice —
+   * `key` is `<jobId>:<expiresAt>`, which makes the refetch once-per-claim.
+   */
+  const onClaimExpired = useCallback(
+    (key: string) => {
+      if (expiredClaims.current.has(key)) return;
+      expiredClaims.current.add(key);
+      void queryClient.invalidateQueries({ queryKey: keys.bootstrap });
+    },
+    [queryClient]
+  );
 
   return (
     <div className="flex h-screen flex-col bg-slate-50">
@@ -57,7 +70,7 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
         installers={board.installers}
         now={now}
         onOpenOrder={setSelectedOrderId}
-        highlightId={highlightId}
+        highlightIds={highlightIds}
         selectedOrderId={selectedOrderId}
         loading={!data}
         onClaimExpired={onClaimExpired}
@@ -77,13 +90,13 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
 }
 
 /**
- * Diffs each order's status against the previous render and flags the one that
- * moved, so its card can carry the 600 ms highlight ring. The first pass only
- * seeds the map — nothing highlights on load.
+ * Diffs each order's status against the previous render and flags every order
+ * that moved, so those cards can carry the 600 ms highlight ring. The first
+ * pass only seeds the map — nothing highlights on load.
  */
-function useStatusHighlight(board: BootstrapDTO): string | null {
+function useStatusHighlight(board: BootstrapDTO): ReadonlySet<string> {
   const previous = useRef<Map<string, OrderStatus> | null>(null);
-  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [highlightIds, setHighlightIds] = useState<ReadonlySet<string>>(NO_HIGHLIGHT);
 
   useEffect(() => {
     const seen = previous.current;
@@ -91,13 +104,20 @@ function useStatusHighlight(board: BootstrapDTO): string | null {
     previous.current = next;
     if (!seen) return;
 
-    const moved = board.orders.find((order) => seen.has(order.id) && seen.get(order.id) !== order.status);
-    if (!moved) return;
+    const moved = board.orders.filter((order) => seen.has(order.id) && seen.get(order.id) !== order.status);
+    if (moved.length === 0) return;
 
-    setHighlightId(moved.id);
-    const timer = setTimeout(() => setHighlightId(null), HIGHLIGHT_MS);
-    return () => clearTimeout(timer);
+    setHighlightIds(new Set(moved.map((order) => order.id)));
   }, [board.orders]);
 
-  return highlightId;
+  // The decay is its own effect keyed on the set: when it lived in the diff
+  // effect, any payload arriving inside the 600 ms window that moved nothing
+  // ran the cleanup and returned without re-arming, stranding the ring.
+  useEffect(() => {
+    if (highlightIds.size === 0) return;
+    const timer = setTimeout(() => setHighlightIds(NO_HIGHLIGHT), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlightIds]);
+
+  return highlightIds;
 }

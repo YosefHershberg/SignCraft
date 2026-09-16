@@ -3,10 +3,19 @@ import { ORDER_STATUSES, type OrderDTO, type OrderStatus, type Persona } from '@
 /** Statuses an installer can act on; everything else collapses to a rail (UI spec §4.2). */
 const INSTALLER_COLUMNS: OrderStatus[] = ['READY_FOR_INSTALL', 'COMPLETED'];
 
-/** Ops and installers see the whole board; a vendor sees only their own orders. */
+/**
+ * Ops see the whole board; a vendor sees only their own orders; an installer
+ * sees the whole marketplace except other installers' finished work — COMPLETED
+ * is their own history ("Completed · your installs", design 1b).
+ */
 export function visibleOrders(orders: OrderDTO[], persona: Persona): OrderDTO[] {
-  if (persona.kind !== 'vendor') return orders.slice();
-  return orders.filter((order) => order.vendorId === persona.id);
+  if (persona.kind === 'vendor') return orders.filter((order) => order.vendorId === persona.id);
+  if (persona.kind === 'installer') {
+    return orders.filter(
+      (order) => order.status !== 'COMPLETED' || order.installJob?.installerId === persona.id
+    );
+  }
+  return orders.slice();
 }
 
 /** Whether a status renders as a full column or as a 40px collapsed rail. */
@@ -27,8 +36,19 @@ export function countsByStatus(orders: OrderDTO[]): Record<OrderStatus, number> 
   return counts;
 }
 
-/** First non-empty status for the persona in board order, else DRAFT (UI spec §4.3). */
+/**
+ * Statuses that get a mobile tab. Ops and vendors get all seven (CANCELLED is a
+ * desktop rail but keeps its own tab); an installer only gets the statuses that
+ * are columns for them, so the tabs match the desktop board.
+ */
+export function mobileStatuses(persona: Persona): OrderStatus[] {
+  if (persona.kind !== 'installer') return [...ORDER_STATUSES];
+  return ORDER_STATUSES.filter((status) => columnMode(status, persona, false) === 'column');
+}
+
+/** First non-empty tab for the persona in board order, else the first tab (UI spec §4.3). */
 export function defaultMobileTab(orders: OrderDTO[], persona: Persona): OrderStatus {
   const counts = countsByStatus(visibleOrders(orders, persona));
-  return ORDER_STATUSES.find((status) => counts[status] > 0) ?? 'DRAFT';
+  const statuses = mobileStatuses(persona);
+  return statuses.find((status) => counts[status] > 0) ?? statuses[0];
 }

@@ -2,26 +2,26 @@
 
 import type { ReactNode } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { countsByStatus, visibleOrders } from '@/lib/board/visibility';
 import { STATUS_META } from '@/lib/domain/status-meta';
-import { ORDER_STATUSES, type OrderDTO, type OrderStatus, type Persona } from '@/lib/domain/types';
+import type { OrderStatus } from '@/lib/domain/types';
 
-/** Scrollable pill tabs above the single-column mobile list (UI spec §4.3). */
+/**
+ * Scrollable pill tabs above the single-column mobile list (UI spec §4.3).
+ * `statuses` and `counts` come from the board so neither is recomputed here.
+ */
 export function MobileStatusTabs({
-  orders,
-  persona,
+  statuses,
+  counts,
   value,
   onChange,
   children,
 }: {
-  orders: OrderDTO[];
-  persona: Persona;
+  statuses: OrderStatus[];
+  counts: Record<OrderStatus, number>;
   value: OrderStatus;
   onChange: (status: OrderStatus) => void;
   children: ReactNode;
 }) {
-  const counts = countsByStatus(visibleOrders(orders, persona));
-
   return (
     <Tabs
       value={value}
@@ -29,7 +29,7 @@ export function MobileStatusTabs({
       className="flex min-h-0 flex-1 flex-col gap-0"
     >
       <TabsList className="h-auto w-full flex-none justify-start gap-2 overflow-x-auto rounded-none border-b border-slate-200 bg-white px-3.5 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {ORDER_STATUSES.map((status) => (
+        {statuses.map((status) => (
           <TabsTrigger
             key={status}
             value={status}

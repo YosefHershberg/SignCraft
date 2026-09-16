@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { columnMode, countsByStatus, defaultMobileTab, visibleOrders } from '@/lib/board/visibility';
-import { ORDER_STATUSES, type OrderDTO, type OrderStatus, type Persona } from '@/lib/domain/types';
+import {
+  columnMode,
+  countsByStatus,
+  defaultMobileTab,
+  mobileStatuses,
+  visibleOrders,
+} from '@/lib/board/visibility';
+import { ORDER_STATUSES, type JobDTO, type OrderDTO, type OrderStatus, type Persona } from '@/lib/domain/types';
 
 const VENDOR_A = 'a'.repeat(24);
 const VENDOR_B = 'b'.repeat(24);
 const INSTALLER_A = 'c'.repeat(24);
+const INSTALLER_B = 'd'.repeat(24);
 
 const ops: Persona = { kind: 'ops' };
 const vendorA: Persona = { kind: 'vendor', id: VENDOR_A };
@@ -34,8 +41,27 @@ function order(id: string, status: OrderStatus, vendorId = VENDOR_A): OrderDTO {
   };
 }
 
+/** A COMPLETED order whose install job was finished by `installerId`. */
+function installedBy(id: string, installerId: string | null, vendorId = VENDOR_A): OrderDTO {
+  const job: JobDTO = {
+    id: `job-${id}`,
+    orderId: id,
+    status: 'ASSIGNED',
+    claim: null,
+    installerId,
+    version: 3,
+    createdAt: '2026-09-16T12:00:00.000Z',
+    updatedAt: '2026-09-16T12:00:00.000Z',
+  };
+  return { ...order(id, 'COMPLETED', vendorId), installJob: installerId ? job : null };
+}
+
 describe('visibleOrders', () => {
-  const orders = [order('1', 'DRAFT', VENDOR_A), order('2', 'SUBMITTED', VENDOR_B), order('3', 'COMPLETED', VENDOR_A)];
+  const orders = [
+    order('1', 'DRAFT', VENDOR_A),
+    order('2', 'SUBMITTED', VENDOR_B),
+    installedBy('3', INSTALLER_A),
+  ];
 
   it('gives ops every order', () => {
     expect(visibleOrders(orders, ops).map((o) => o.id)).toEqual(['1', '2', '3']);
@@ -45,8 +71,20 @@ describe('visibleOrders', () => {
     expect(visibleOrders(orders, vendorA).map((o) => o.id)).toEqual(['1', '3']);
   });
 
-  it('gives an installer every order', () => {
+  it('gives an installer every open order plus their own completed installs', () => {
     expect(visibleOrders(orders, installer).map((o) => o.id)).toEqual(['1', '2', '3']);
+  });
+
+  it('hides completed orders installed by someone else from an installer', () => {
+    const board = [
+      order('1', 'READY_FOR_INSTALL', VENDOR_B),
+      installedBy('2', INSTALLER_B),
+      installedBy('3', INSTALLER_A),
+      installedBy('4', null),
+    ];
+    expect(visibleOrders(board, installer).map((o) => o.id)).toEqual(['1', '3']);
+    expect(visibleOrders(board, ops).map((o) => o.id)).toEqual(['1', '2', '3', '4']);
+    expect(visibleOrders(board, vendorA).map((o) => o.id)).toEqual(['2', '3', '4']);
   });
 
   it('does not mutate the input', () => {
@@ -103,6 +141,17 @@ describe('countsByStatus', () => {
   });
 });
 
+describe('mobileStatuses', () => {
+  it('gives ops and vendors a tab per status, cancelled included', () => {
+    expect(mobileStatuses(ops)).toEqual([...ORDER_STATUSES]);
+    expect(mobileStatuses(vendorA)).toEqual([...ORDER_STATUSES]);
+  });
+
+  it('gives an installer only the statuses that are not rails', () => {
+    expect(mobileStatuses(installer)).toEqual(['READY_FOR_INSTALL', 'COMPLETED']);
+  });
+});
+
 describe('defaultMobileTab', () => {
   it('returns the first non-empty status in ORDER_STATUSES order', () => {
     expect(defaultMobileTab([order('1', 'COMPLETED'), order('2', 'SUBMITTED')], ops)).toBe('SUBMITTED');
@@ -117,5 +166,13 @@ describe('defaultMobileTab', () => {
     const orders = [order('1', 'DRAFT', VENDOR_B), order('2', 'IN_PRODUCTION', VENDOR_A)];
     expect(defaultMobileTab(orders, ops)).toBe('DRAFT');
     expect(defaultMobileTab(orders, vendorA)).toBe('IN_PRODUCTION');
+  });
+
+  it('only considers statuses the persona has a tab for', () => {
+    const orders = [order('1', 'DRAFT'), order('2', 'COMPLETED')];
+    // DRAFT is a rail for an installer, and that COMPLETED order is someone
+    // else's install, so the installer falls back to their first tab.
+    expect(defaultMobileTab(orders, installer)).toBe('READY_FOR_INSTALL');
+    expect(defaultMobileTab([order('1', 'DRAFT'), installedBy('2', INSTALLER_A)], installer)).toBe('COMPLETED');
   });
 });

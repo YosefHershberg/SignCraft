@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { columnMode, countsByStatus, defaultMobileTab, visibleOrders } from '@/lib/board/visibility';
+import { columnMode, countsByStatus, defaultMobileTab, mobileStatuses, visibleOrders } from '@/lib/board/visibility';
 import { serialisePersona } from '@/lib/domain/personas';
 import { ORDER_STATUSES, type InstallerDTO, type OrderDTO, type OrderStatus, type Persona } from '@/lib/domain/types';
 import { CollapsedRail } from './collapsed-rail';
@@ -18,7 +18,8 @@ export interface KanbanBoardProps {
   installers: InstallerDTO[];
   now: number;
   onOpenOrder: (orderId: string) => void;
-  highlightId?: string | null;
+  /** Orders that just changed status; each keeps the ring for 600 ms. */
+  highlightIds?: ReadonlySet<string>;
   selectedOrderId?: string | null;
   loading?: boolean;
   onAction?: OrderCardProps['onAction'];
@@ -45,7 +46,7 @@ export function KanbanBoard({
   installers,
   now,
   onOpenOrder,
-  highlightId,
+  highlightIds,
   selectedOrderId,
   loading,
   onAction,
@@ -53,12 +54,19 @@ export function KanbanBoard({
   onClaimExpired,
 }: KanbanBoardProps) {
   const [expandedCancelled, setExpandedCancelled] = useState(false);
-  const [tabState, setTabState] = useState<{ personaKey: string; status: OrderStatus } | null>(null);
 
   const visible = visibleOrders(orders, persona);
   const counts = countsByStatus(visible);
   const personaKey = serialisePersona(persona);
-  const tab = tabState?.personaKey === personaKey ? tabState.status : defaultMobileTab(orders, persona);
+  const tabs = mobileStatuses(persona);
+
+  // The tab is seeded once per persona rather than derived every render: a
+  // realtime update that empties the current tab must not move the user.
+  const [tabState, setTabState] = useState(() => ({ personaKey, status: defaultMobileTab(orders, persona) }));
+  const seeded =
+    tabState.personaKey === personaKey ? tabState : { personaKey, status: defaultMobileTab(orders, persona) };
+  if (seeded !== tabState) setTabState(seeded);
+  const tab = seeded.status;
 
   const card: CardBinding = { persona, installers, now, onAction, onVerify, onClaimExpired };
   const emptyLabel = persona.kind === 'vendor' ? 'No orders for you here' : undefined;
@@ -69,7 +77,12 @@ export function KanbanBoard({
     <main className="flex min-h-0 flex-1 flex-col">
       {/* Mobile: pill tabs + a single list */}
       <div className="flex min-h-0 flex-1 flex-col md:hidden">
-        <MobileStatusTabs orders={orders} persona={persona} value={tab} onChange={(status) => setTabState({ personaKey, status })}>
+        <MobileStatusTabs
+          statuses={tabs}
+          counts={counts}
+          value={tab}
+          onChange={(status) => setTabState({ personaKey, status })}
+        >
           <div className="flex flex-col gap-3 p-3.5">
             {loading && [0, 1, 2].map((i) => <SkeletonCard key={i} />)}
             {!loading &&
@@ -79,7 +92,7 @@ export function KanbanBoard({
                   order={order}
                   vendorName={vendorNames[order.vendorId] ?? 'Vendor unassigned'}
                   onOpen={onOpenOrder}
-                  highlight={highlightId === order.id}
+                  highlight={highlightIds?.has(order.id) ?? false}
                   selected={selectedOrderId === order.id}
                   {...card}
                 />
@@ -100,7 +113,7 @@ export function KanbanBoard({
               vendorNames={vendorNames}
               card={card}
               onOpenOrder={onOpenOrder}
-              highlightId={highlightId}
+              highlightIds={highlightIds}
               selectedOrderId={selectedOrderId}
               label={gridLayout ? INSTALLER_LABEL[status] : undefined}
               emptyLabel={emptyLabel}

@@ -1,36 +1,33 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { formatCountdown } from '@/lib/domain/format';
 import { cn } from '@/lib/utils';
 
 /**
- * Monospace mm:ss for a claim TTL. The tick comes from the board's shared
- * `useNow()` (one interval for the whole page); `onExpire` fires exactly once
- * per claim so the parent can invalidate the bootstrap query and let the
- * server's lazy expiry reconcile.
+ * Monospace mm:ss for a claim TTL. Purely presentational: the tick comes from
+ * the board's shared `useNow()` (one interval for the whole page), and the
+ * expiry edge is detected by `JobChip` against the raw job — by the time the
+ * remainder would reach zero the claim already reads as OPEN and this
+ * component is unmounted.
+ *
+ * The remainder is rounded *up* to the next second so a live claim never shows
+ * "0:00" (`formatCountdown` rounds to nearest, which would display 0:00 for the
+ * last ~500 ms of a claim that is still CLAIMED on the server).
  */
 export function ClaimCountdown({
   expiresAt,
   now,
-  onExpire,
   className,
 }: {
   expiresAt: string;
   now: number;
-  onExpire?: () => void;
   className?: string;
 }) {
   const remaining = Math.max(0, new Date(expiresAt).getTime() - now);
-  const firedFor = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (remaining > 0 || firedFor.current === expiresAt) return;
-    firedFor.current = expiresAt;
-    onExpire?.();
-  }, [remaining, expiresAt, onExpire]);
 
   return (
-    <span className={cn('font-mono font-semibold tabular-nums', className)}>{formatCountdown(remaining)}</span>
+    <span className={cn('font-mono font-semibold tabular-nums', className)}>
+      {formatCountdown(Math.ceil(remaining / 1000) * 1000)}
+    </span>
   );
 }

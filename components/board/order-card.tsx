@@ -26,7 +26,8 @@ export interface OrderCardProps {
   /** Task 13 wires the overflow menu; without it the ⋯ button is not rendered. */
   onAction?: (order: OrderDTO, action: OrderAction) => void;
   onVerify?: (job: JobDTO) => void;
-  onClaimExpired?: () => void;
+  /** Fired once per lapsed claim, keyed `<jobId>:<expiresAt>` so the board can dedupe. */
+  onClaimExpired?: (key: string) => void;
 }
 
 /** One order on the board (DESIGN.md "Order card", UI spec §4.2). */
@@ -56,6 +57,8 @@ export function OrderCard({
     (a) => !(persona.kind === 'installer' && a.action === 'complete')
   );
   const jobActions = jobActionsFor(persona, order.installJob, at);
+  // Muted only when the persona can do *nothing* with the card — a card with a
+  // disabled-but-listed action still reads as actionable (DESIGN.md "Order card").
   const inert = actions.length === 0 && !jobActions.canClaim && !jobActions.canVerify && !jobActions.canComplete;
 
   const uploading = order.assets.find((a) => a.status === 'UPLOADING');
@@ -68,7 +71,7 @@ export function OrderCard({
       role="button"
       tabIndex={0}
       aria-label={`${order.orderNumber} — ${order.title}`}
-      data-selected={selected || undefined}
+      data-selected={selected ? 'true' : undefined}
       onClick={() => onOpen(order.id)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -80,6 +83,8 @@ export function OrderCard({
         'animate-in fade-in slide-in-from-left-2 flex shrink-0 cursor-pointer overflow-hidden rounded-[8px]',
         'border border-slate-200 bg-white text-left shadow-[0_1px_2px_rgba(15,23,42,0.06)] duration-300',
         'focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:outline-none',
+        // Selected = the card whose detail sheet is open (Task 13): teal border.
+        'data-[selected=true]:border-[#0D9488]',
         inert && 'opacity-85',
         highlight && 'ring-2 ring-teal-500 ring-offset-1'
       )}

@@ -4,7 +4,13 @@ import { STATUS_META } from '@/lib/domain/status-meta';
 import type { OrderStatus } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
 
-/** 40px rail with a rotated label; clicking expands it when `onExpand` is given. */
+const SHELL = 'flex w-10 flex-none snap-start flex-col items-center gap-2.5 rounded-[8px] bg-slate-100 py-2';
+
+/**
+ * 40px rail with a rotated label. Only the CANCELLED rail can be opened, so it
+ * is the only one that renders a button; the installer's read-only rails are a
+ * labelled group, not a disabled control nobody can use.
+ */
 export function CollapsedRail({
   status,
   count,
@@ -15,18 +21,10 @@ export function CollapsedRail({
   onExpand?: () => void;
 }) {
   const meta = STATUS_META[status];
+  const label = `${meta.label} · ${count}`;
 
-  return (
-    <button
-      type="button"
-      disabled={!onExpand}
-      onClick={onExpand}
-      aria-label={`${meta.label}: ${count}`}
-      className={cn(
-        'flex w-10 flex-none snap-start flex-col items-center gap-2.5 rounded-[8px] bg-slate-100 py-2',
-        onExpand ? 'cursor-pointer' : 'cursor-default'
-      )}
-    >
+  const body = (
+    <>
       <span className="size-1.5 flex-none rounded-full" style={{ background: meta.dot }} />
       <span className="rounded-[6px] bg-slate-200 px-[5px] font-mono text-[11px] leading-4 font-medium text-slate-600 tabular-nums">
         {count}
@@ -39,6 +37,20 @@ export function CollapsedRail({
       >
         {meta.label}
       </span>
+    </>
+  );
+
+  if (!onExpand) {
+    return (
+      <div role="group" aria-label={label} className={SHELL}>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onExpand} aria-label={`${label} — expand`} className={cn(SHELL, 'cursor-pointer')}>
+      {body}
     </button>
   );
 }

@@ -19,7 +19,7 @@ export interface StatusColumnProps {
   vendorNames: Record<string, string>;
   card: CardBinding;
   onOpenOrder: (orderId: string) => void;
-  highlightId?: string | null;
+  highlightIds?: ReadonlySet<string>;
   selectedOrderId?: string | null;
   /** Overrides the status label, e.g. "Ready for install · marketplace". */
   label?: string;
@@ -35,7 +35,7 @@ export function StatusColumn({
   vendorNames,
   card,
   onOpenOrder,
-  highlightId,
+  highlightIds,
   selectedOrderId,
   label,
   emptyLabel,
@@ -53,7 +53,7 @@ export function StatusColumn({
         grid ? 'min-w-0 flex-1 p-3' : 'w-[280px] flex-none xl:w-auto xl:min-w-0 xl:flex-1'
       )}
     >
-      <div className="sticky top-0 z-10 flex items-center gap-2 bg-slate-100 px-1 pt-1">
+      <div className="flex items-center gap-2 px-1 pt-1">
         <span className="size-1.5 flex-none rounded-full" style={{ background: meta.dot }} />
         <span className="flex-1 truncate text-[11px] leading-4 font-semibold tracking-[0.04em] uppercase text-slate-600">
           {label ?? meta.label}
@@ -81,7 +81,7 @@ export function StatusColumn({
               order={order}
               vendorName={vendorNames[order.vendorId] ?? 'Vendor unassigned'}
               onOpen={onOpenOrder}
-              highlight={highlightId === order.id}
+              highlight={highlightIds?.has(order.id) ?? false}
               selected={selectedOrderId === order.id}
               {...card}
             />
