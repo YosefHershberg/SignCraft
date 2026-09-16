@@ -19,6 +19,8 @@ type SeedOrder = {
   vendor: string;
   status: OrderStatus;
   notes?: string;
+  /** Set only for a CANCELLED order: the status it was cancelled from (history stops there, then adds a CANCELLED entry). */
+  cancelledFrom?: OrderStatus;
 };
 
 const ORDERS: SeedOrder[] = [
@@ -26,7 +28,7 @@ const ORDERS: SeedOrder[] = [
   { n: 2, title: 'Window decal set', customer: 'Cedar & Co', signType: 'STOREFRONT', w: 120, h: 80, qty: 4, address: '4 Cedar Row, York', dueIn: 8, vendor: 'Brightline Fab', status: 'DRAFT' },
   { n: 3, title: 'Monument base', customer: 'Northwind Dental', signType: 'MONUMENT', w: 180, h: 120, qty: 1, address: '88 Harbour Rd, Hull', dueIn: 21, vendor: 'Metro Signworks', status: 'DRAFT' },
   { n: 4, title: 'Pylon refacing', customer: 'Grove Market', signType: 'WAYFINDING', w: 90, h: 240, qty: 2, address: '1 Grove Sq, Sheffield', dueIn: 14, vendor: 'Acme Signs', status: 'VENDOR_ACCEPTED' },
-  { n: 5, title: 'Lobby letters', customer: 'Halcyon Hotel', signType: 'STOREFRONT', w: 200, h: 40, qty: 1, address: '30 Park Ln, Leeds', dueIn: 12, vendor: 'Brightline Fab', status: 'VENDOR_ACCEPTED' },
+  { n: 5, title: 'Lobby letters', customer: 'Halcyon Hotel', signType: 'STOREFRONT', w: 200, h: 40, qty: 1, address: '30 Park Ln, Leeds', dueIn: 12, vendor: 'Brightline Fab', status: 'CANCELLED', cancelledFrom: 'SUBMITTED' },
   { n: 6, title: 'Directory panel', customer: 'Lakeshore Clinic', signType: 'WAYFINDING', w: 60, h: 150, qty: 3, address: '7 Lake Dr, Bradford', dueIn: 6, vendor: 'Metro Signworks', status: 'IN_PRODUCTION' },
   { n: 7, title: 'Blade sign', customer: "Otto's Garage", signType: 'BANNER', w: 50, h: 100, qty: 1, address: '19 Otto St, Wakefield', dueIn: 5, vendor: 'Acme Signs', status: 'READY_FOR_INSTALL' },
   { n: 8, title: 'Van wrap', customer: 'Peak Couriers', signType: 'VEHICLE_WRAP', w: 500, h: 200, qty: 2, address: '2 Summit Way, Leeds', dueIn: 3, vendor: 'Brightline Fab', status: 'COMPLETED' },
@@ -47,15 +49,29 @@ export async function seed() {
   for (const o of ORDERS) {
     const orderNumber = `SC-${String(o.n).padStart(4, '0')}`;
     if (await prisma.order.findUnique({ where: { orderNumber } })) continue;
-    const idx = CHAIN.indexOf(o.status);
-    const history = CHAIN.slice(0, idx + 1).map((to, i) => ({
-      from: i === 0 ? null : CHAIN[i - 1],
-      to,
-      actorType: i === 0 ? 'SYSTEM' : i === 1 ? 'OPS' : i === 5 ? 'INSTALLER' : 'VENDOR',
-      actorId: null,
-      reason: null,
-      at: new Date(now - (idx - i + 1) * 3_600_000),
-    })) as { from: OrderStatus | null; to: OrderStatus; actorType: 'OPS' | 'VENDOR' | 'INSTALLER' | 'SYSTEM'; actorId: null; reason: null; at: Date }[];
+    // For a CANCELLED order, the chain history runs up to `cancelledFrom`, then a CANCELLED
+    // entry is appended below — CANCELLED itself is not part of CHAIN.
+    const idx = CHAIN.indexOf(o.cancelledFrom ?? o.status);
+    const history: { from: OrderStatus | null; to: OrderStatus; actorType: 'OPS' | 'VENDOR' | 'INSTALLER' | 'SYSTEM'; actorId: null; reason: string | null; at: Date }[] =
+      CHAIN.slice(0, idx + 1).map((to, i) => ({
+        from: i === 0 ? null : CHAIN[i - 1],
+        to,
+        actorType: i === 0 ? 'SYSTEM' : i === 1 ? 'OPS' : i === 5 ? 'INSTALLER' : 'VENDOR',
+        actorId: null,
+        reason: null,
+        at: new Date(now - (idx - i + 1) * 3_600_000),
+      }));
+    if (o.cancelledFrom) {
+      history.push({
+        from: o.cancelledFrom,
+        to: 'CANCELLED',
+        actorType: 'OPS',
+        actorId: null,
+        reason: 'Customer withdrew the order',
+        at: new Date(now - 3_600_000),
+      });
+    }
+    const version = o.cancelledFrom ? idx + 1 : idx;
     const order = await prisma.order.create({
       data: {
         orderNumber,
@@ -70,7 +86,7 @@ export async function seed() {
         notes: o.notes ?? null,
         vendorId: vendors.get(o.vendor)!,
         status: o.status,
-        version: idx,
+        version,
         history,
       },
     });

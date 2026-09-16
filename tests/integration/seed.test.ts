@@ -24,5 +24,10 @@ describe('seed', () => {
       include: { assets: true },
     });
     expect(draft?.assets.some((a) => a.status === 'UPLOADED')).toBe(true);
+    const cancelled = await prisma.order.findMany({ where: { status: 'CANCELLED' } });
+    expect(cancelled).toHaveLength(1);
+    const lastEntry = cancelled[0]!.history[cancelled[0]!.history.length - 1];
+    expect(lastEntry?.to).toBe('CANCELLED');
+    expect(lastEntry?.reason).not.toBeNull();
   });
 });
