@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { JobPanel } from '@/components/jobs/job-panel';
+import { UploadPanel } from '@/components/uploads/upload-panel';
 import type { InstallerDTO, JobDTO, OrderAction, OrderDTO, Persona, VendorDTO } from '@/lib/domain/types';
 import { useOrder } from '@/lib/query/hooks';
 import { DetailsGrid } from './details-grid';
@@ -114,7 +115,7 @@ export function OrderDetailSheet({
 
           <DetailsGrid order={order} vendorName={vendorName} />
 
-          {/* UploadPanel slot (Task 15) — asset rows, Upload file / Simulate large file. */}
+          <UploadPanel order={order} persona={persona} />
 
           <HistoryTimeline order={order} vendors={vendors} installers={installers} />
         </div>
