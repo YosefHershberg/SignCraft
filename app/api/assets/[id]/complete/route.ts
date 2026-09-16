@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 
 export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const id = await parseId(params);
-  requireKind(req, 'ops');
+  const persona = requireKind(req, 'ops');
   const body = await parseBody(req, completeSchema);
-  return json(await completeAsset(id, body.parts));
+  return json(await completeAsset(id, body.parts, persona));
 });

@@ -5,7 +5,8 @@ import { ApiError } from './errors';
 function cookiePersona(req: Request): string | null {
   const cookie = req.headers.get('cookie');
   if (!cookie) return null;
-  for (const part of cookie.split('; ')) {
+  // `;` with any (or no) following whitespace — not every client sends `'; '`.
+  for (const part of cookie.split(/;\s*/)) {
     const [name, ...rest] = part.split('=');
     if (name === 'sc_persona') {
       try {

@@ -41,6 +41,8 @@ Notes:
 
 A persona is sent with every request as an `x-persona` header (`ops`, `vendor:<id>`, `installer:<id>`) and parsed server-side in `lib/api/persona.ts`. Every mutation re-checks it; the UI only mirrors what the server would allow.
 
+Write authorisation is enforced server-side per persona; read filtering (a vendor seeing only their own orders) is client-side — `GET /api/bootstrap` returns the whole board and `lib/board/visibility.ts` narrows it — since a spoofable header cannot be a confidentiality boundary anyway.
+
 The `sc_persona` cookie only *seeds* the first render of a tab; after that each tab keeps its persona in React state. That is what lets two tabs be two different installers — just do not reload the first tab afterwards, or it will pick up the persona the second tab wrote to the shared cookie.
 
 | Persona | Sees | Can do |
@@ -61,7 +63,7 @@ The `sc_persona` cookie only *seeds* the first render of a tab; after that each 
 | Change streams | `mongodb` native driver, imported only in `lib/db/mongo.ts` |
 | Object storage | Cloudflare R2 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` |
 | Validation | Zod 4 (`lib/domain/schemas.ts`, shared by API and forms) |
-| Tests | Vitest (unit + integration), `@testing-library/react` + jsdom for component tests |
+| Tests | Vitest (unit + integration); `@testing-library/react` + jsdom for one component test file |
 | Hosting | Vercel (Node runtime, Fluid compute) |
 
 ## Architecture
@@ -103,8 +105,8 @@ Why `InstallJob` is a separate collection: the claim race is then a conditional 
 | From | Allowed to | Who |
 |---|---|---|
 | DRAFT | SUBMITTED, CANCELLED | Ops submits; Ops or the owning vendor cancels |
-| SUBMITTED | VENDOR_ACCEPTED, CANCELLED | the owning vendor accepts |
-| VENDOR_ACCEPTED | IN_PRODUCTION, CANCELLED | the owning vendor |
+| SUBMITTED | VENDOR_ACCEPTED, CANCELLED | the owning vendor accepts; Ops or the owning vendor cancels |
+| VENDOR_ACCEPTED | IN_PRODUCTION, CANCELLED | the owning vendor starts production; Ops or the owning vendor cancels |
 | IN_PRODUCTION | READY_FOR_INSTALL | the owning vendor |
 | READY_FOR_INSTALL | COMPLETED | the installer assigned to the job |
 | COMPLETED, CANCELLED | — | terminal |
@@ -175,7 +177,9 @@ Vercel caps request bodies at 4.5 MB, so file bytes must never touch the app. Th
 
 Objects are keyed `orders/<orderId>/<assetId>/<sanitised file name>`.
 
-**Simulating a large file.** "Simulate large file" offers 100 MB / 1 GB / 2 GB (`SIMULATED_SIZES`). `simulatedSource` allocates one zero-filled 10 MiB buffer and hands out `Blob` views of it per part, so browser memory stays at one part while genuinely uploading the full size through the identical pipeline. The asset is flagged `simulated: true` and named `simulated-1gb.bin`. Real objects land in R2, so give the bucket a lifecycle rule expiring `simulated-*` objects after a day unless you want to pay to store gigabytes of zeroes.
+**Simulating a large file.** "Simulate large file" offers 100 MB / 1 GB / 2 GB (`SIMULATED_SIZES`). `simulatedSource` allocates one zero-filled 10 MiB buffer and slices a `Blob` off it per part instead of allocating the whole file, so peak browser memory is that one buffer plus the parts in flight — four at a time, so roughly 40 MiB, not 1 GB — while the full size genuinely goes up the identical pipeline. The asset is flagged `simulated: true` and named `simulated-1gb.bin`.
+
+Real objects land in R2, and they are not cheap to leave lying around. There is no lifecycle rule that catches only the simulated ones: object keys are `orders/<orderId>/<assetId>/<file name>`, so `simulated` appears in the *last* segment and R2 lifecycle rules match by prefix. The choices are a rule on the `orders/` prefix (which expires real uploads too — fine for a demo bucket, wrong for anything else) or deleting them by hand; `pnpm tsx scripts/list-r2.ts` prints what is in the bucket.
 
 **Required R2 bucket CORS rule:**
 
@@ -212,25 +216,32 @@ Clients (`lib/realtime/use-realtime.ts`) apply each event straight into the TanS
 | `R2_ACCOUNT_ID` | yes | Cloudflare account id; forms the S3 endpoint `https://<id>.r2.cloudflarestorage.com` |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | yes | R2 API token pair (Object Read & Write is enough) |
 | `R2_BUCKET` | yes | bucket name |
-| `NEXT_PUBLIC_APP_URL` | yes | public origin; must match an entry in the bucket's CORS `AllowedOrigins`. `http://localhost:3000` locally; on Vercel it is set to `https://signcraft-blond.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | no | informational: the origin to list in the bucket's CORS `AllowedOrigins` (`http://localhost:3000` locally, `https://signcraft-blond.vercel.app` on Vercel). No code reads it — `grep -rn NEXT_PUBLIC_APP_URL app lib components` is empty; the browser talks to the app on its own origin and to R2 on the presigned URL. |
 | `CLAIM_TTL_MS` | no | claim window in ms; default 180 000. Set it to e.g. `20000` to watch the auto-release without waiting 3 minutes. |
 
 ## Tests
 
 ```bash
-pnpm test                 # 274 unit tests, no infrastructure, ~12 s
-pnpm test:integration     # 47 integration tests against Atlas, ~4.5 min
+pnpm test                 # 284 unit tests, no infrastructure, about 15 s
+pnpm test:integration     # 48 integration tests against Atlas, ~4.5 min
 pnpm typecheck            # tsc --noEmit
 ```
 
-Unit tests (`tests/unit/`, 25 files) cover the pure modules: the transition table and guards, the persona parser, the claim-expiry predicate, the SSE frame mapping and connection state machine, the DTO normaliser, the part plan and ETA maths, the uploader (with a fake `put`), and a handful of component tests under jsdom.
+Unit tests (`tests/unit/`, 26 files) cover the pure modules: the transition table and guards, the persona parser, the claim-expiry predicate, the SSE frame mapping and connection state machine, the DTO normaliser, the part plan and ETA maths, the uploader (with a fake `put`), and one component test file (`tests/unit/jobs/job-chip.test.tsx`, 5 tests) under jsdom.
 
 Integration tests (`tests/integration/`, 8 files) run against a real MongoDB replica set and mock R2 at the `lib/storage/r2.ts` boundary. They cover the claim race and expiry, verification outcomes, every transition rule through both the services and the exported route handlers, the asset lifecycle, the seed, and a real change-stream round trip (`tests/integration/sse.test.ts › emits a job.updated frame within 5s of a real InstallJob update`).
 
-**Integration tests need their own database.** They call `resetDb()` before each test, which deletes every document — so point them at a separate database name on the same Atlas cluster, never at your demo data. From the repo root:
+**Integration tests need their own database.** They call `resetDb()` before each test, which deletes every document — so point them at a separate database name on the same Atlas cluster, never at your demo data. The suite enforces that itself: unless the database name in `DATABASE_URL` ends with `_test` (or `ALLOW_DESTRUCTIVE_TESTS=1` is set), setup throws `Refusing to wipe "<db>"` and nothing is deleted. From the repo root:
 
 ```bash
 export DATABASE_URL="$(node -e "require('dotenv').config({path:'.env'});const u=process.env.DATABASE_URL;const [b,q]=u.split('?');process.stdout.write(b.replace(/\/signcraft$/,'/signcraft_test')+(q?'?'+q:''))")"
+pnpm test:integration
+```
+
+PowerShell, same thing:
+
+```powershell
+$env:DATABASE_URL = node -e "require('dotenv').config({path:'.env'});const u=process.env.DATABASE_URL;const [b,q]=u.split('?');process.stdout.write(b.replace(/\/signcraft$/,'/signcraft_test')+(q?'?'+q:''))"
 pnpm test:integration
 ```
 
@@ -239,6 +250,8 @@ That rewrites the database name in your `.env` string from `signcraft` to `signc
 ```bash
 pnpm vitest run --project integration tests/integration/jobs.test.ts
 ```
+
+R2 is mocked in the suite, so nothing here proves an object reached the bucket. `pnpm tsx scripts/list-r2.ts [prefix]` does: it lists the keys and sizes under `orders/` with the app's own `R2_*` credentials, which is how you verify that an upload from the browser really landed in storage (the app never sees the bytes, so no test can).
 
 Integration tests are deliberately serial (`fileParallelism: false`) with a 30 s timeout: every assertion is a real round trip to Atlas, and an M0 cluster takes roughly 2–3 s per write batch.
 
@@ -250,11 +263,11 @@ Each of these is an ADR in [`docs/superpowers/specs/2026-09-16-signcraft-decisio
 - **Expiry is lazy, not scheduled.** A stale `CLAIMED` can sit in the database while nobody is connected. It is invisible because every reader and every writer applies the same predicate, but an inspection of the raw collection can show one. A Vercel Pro cron sweeper or an Upstash QStash callback at T+3 min would make it eager; neither changes correctness.
 - **One change stream per connected dashboard.** Correct and simple at demo scale; Atlas M0 allows 500 connections. On a long-lived host the next step is one shared stream per instance with in-memory fan-out; on Vercel it would mean hosted pub/sub (Ably, Pusher).
 - **Upload progress travels through the database.** Roughly 20–30 small writes per upload so other viewers see the bar move. Redis pub/sub would avoid the writes at the cost of a second datastore and a second source of truth.
-- **Personas instead of authentication.** Identity is trusted from a header so two installers can race in two tabs. Authorisation is still enforced server-side per persona; swapping the header for a session lookup in `lib/api/persona.ts` is the only change real auth would need. This is a demo affordance, not a security model.
+- **Personas instead of authentication.** Identity is trusted from a header so two installers can race in two tabs. *Write* authorisation is still enforced server-side per persona; *read* filtering (vendor sees own orders) is client-side, since a spoofable header cannot be a confidentiality boundary. Swapping the header for a session lookup in `lib/api/persona.ts` — and then filtering the bootstrap query by the session — is what real auth would need. This is a demo affordance, not a security model.
 - **Prisma 6 plus the native driver.** Prisma does not expose `watch()`, so the `mongodb` driver shares the same connection string in `lib/db/mongo.ts` — two pools to one database, one file.
 - **Atlas M0 latency.** A cold write to an M0 cluster takes 2–3 s, which is why the integration suite runs about 4.5 minutes and why the first interaction after an idle period feels slow. It does not affect the claim guarantee, only the wall clock.
 - **The detail sheet is non-modal.** It renders without a pointer-blocking overlay so that switching persona while it is open keeps it open (UI spec §7.8) and lets you drive a second persona against the same order. The cost is no focus trap: the board behind stays in the tab order.
-- **The whole board re-renders once per second while any claim is counting down.** One shared `useNow` clock threads `now` down as a prop rather than giving every chip its own timer. At eight orders this is free; a real board would memoise the countdown subtree or move it to CSS.
+- **The whole board re-renders once per second, for the life of the page.** One shared `useNow` clock threads `now` down as a prop rather than giving every chip its own timer, and `components/dashboard.tsx` calls it unconditionally — the interval runs whether or not a claim is counting down, so the re-render is constant, not occasional. At eight orders this is free; a real board would gate the clock on there being a live claim, memoise the countdown subtree, or move the animation to CSS.
 - **`orderNumber` is generated with `count()` then `create`,** with a single retry on a unique-index collision. Not safe under heavy concurrent order creation (a sequence collection or a random suffix would be), but order creation is a one-at-a-time human action while the claim — which *is* contended — is properly atomic.
 - **No browser end-to-end tests.** Playwright would prove the two-tab race most convincingly, at about a day's work. The guarantee is proven in-process instead by the 50-way claim race, and the browser flows are covered by the checklist below.
 
@@ -285,6 +298,7 @@ components/
   orders/                  detail sheet, create/transition dialogs, history
   jobs/                    claim button, countdown, verification dialog
   uploads/                 upload panel, asset rows, simulate dialog
+  layout/                  app header: persona switcher, connection indicator, count pills
   ui/                      Shadcn primitives
 lib/
   domain/                  pure: state machine, permissions, claims, constants, schemas
@@ -295,8 +309,12 @@ lib/
   upload/                  browser multipart uploader, part sources, plan maths
   api/                     ApiError, persona parsing, Zod validation, responses
   query/                   TanStack Query keys, hooks, fetch client
+  board/                   pure per-persona visibility rules for the columns
+  persona/                 the client persona context and its cookie seed
+  hooks/                   useNow, the one shared 1 s clock
 prisma/                    schema.prisma, seed.ts
-tests/                     unit/ (no infra) and integration/ (real Atlas)
+scripts/                   list-r2.ts, the bucket check
+tests/                     unit/ (no infra), integration/ (real Atlas), helpers/
 docs/superpowers/specs/    architecture, ADRs, UI pages and flows
 docs/design/               visual design tokens and exported screens
 EXPLANATIONS.md            requirement-by-requirement walkthrough

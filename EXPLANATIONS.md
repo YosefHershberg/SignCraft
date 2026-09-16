@@ -44,7 +44,40 @@ One section per requirement in [`SignCraft_Task_Specification.md`](SignCraft_Tas
 
 **Limits.** The order *detail sheet* is deliberately **not** modal (`modal={false}`): it renders without a pointer-blocking overlay so a persona switch while it is open keeps it open (UI spec §7.8), which is what makes the two-persona walkthrough possible in a single window. The cost is that it has no focus trap — the board behind stays in the tab order. Focus is still restored to the trigger on close (`components/orders/use-restore-focus.ts`).
 
-## 4. State lifecycle and validation
+## 4. Backend API and event processing with Next.js API routes
+
+> "Implement the backend API and event processing using Next.js/Remix API Routes."
+
+**Where.** `app/api/**/route.ts` — eleven handlers, no other server entry points — with the shared plumbing in `lib/api/` (`errors.ts`, `persona.ts`, `validate.ts`, `params.ts`, `respond.ts`) and the work itself in `lib/services/`.
+
+**How.** Every handler is an App Router route handler on the Node runtime (`export const runtime = 'nodejs'`), and every one is four lines of the same shape: parse the path param, resolve the persona, hand a Zod-validated body to a service, respond. The largest file under `app/api` is 33 lines.
+
+| Route | Method | Does |
+|---|---|---|
+| `/api/bootstrap` | GET | the whole board: vendors, installers, orders with jobs and assets, server clock |
+| `/api/orders` | POST | create a draft (ops) |
+| `/api/orders/:id/transition` | POST | the state machine, 400 on an invalid jump |
+| `/api/jobs/:id/claim` | POST | the one conditional update that decides the race |
+| `/api/jobs/:id/verify` | POST | pass → ASSIGNED, fail → OPEN |
+| `/api/assets` | POST | create the row and the R2 multipart upload |
+| `/api/assets/:id/parts` | POST | presign a batch of part URLs |
+| `/api/assets/:id/progress` | POST | record client-reported bytes (204) |
+| `/api/assets/:id/complete` | POST | finish the multipart upload |
+| `/api/assets/:id/abort` | POST | abandon it; `ABORTED` or `FAILED` |
+| `/api/events` | GET | the SSE stream (event processing, below) |
+
+Three rules keep them thin. `withErrorHandling` wraps every export, so a handler throws `ApiError(status, code, details)` and never formats a response: `{ error: { code, message, details } }` with the right status comes out the other side, and a `ZodError` becomes a 400 `VALIDATION_ERROR` with the flattened issues. The persona is parsed in exactly one place (`lib/api/persona.ts`) — `requirePersona` or `requireKind(req, 'ops')` — so no handler reads the header itself. And no business rule lives in a handler: the state machine, the claim filter, and the upload guards are all in `lib/services/*`, which is what lets the integration tests call either the service or the exported `POST` directly.
+
+**Event processing** is the same pattern for a stream rather than a response: `GET /api/events` sweeps expired claims, opens one Mongo change stream, and returns a `ReadableStream` built by `createSseStream` (`lib/realtime/sse.ts`) — heartbeats, the 280 s reconnect, resume tokens, and resync on a lost token. The handler stays declarative; the stream logic is a pure-ish module with a `watch` dependency, which is why it is unit-testable without a database. §9 covers it in detail.
+
+**Verify.**
+- `tests/integration/routes.test.ts` calls the exported handlers themselves (`POST`, `GET`) with real `Request` objects: 201 with an `orderNumber`, 403 without a persona, 400 on malformed JSON, 400 `INVALID_TRANSITION` with the allowed list, 404 on a malformed `[id]`, 204 from the progress endpoint, and a full claim → verify → complete flow.
+- `tests/unit/api/errors.test.ts`, `tests/unit/api/persona.test.ts`, `tests/unit/api/validate.test.ts` cover the plumbing.
+- `tests/integration/events-route.test.ts › returns the SSE headers, a connected comment, and a real job.updated frame`.
+
+**Limits.** There is no OpenAPI document and no generated client — the shared Zod schemas in `lib/domain/schemas.ts` are the contract, which works because both ends are in this repo. Route handlers are unversioned (`/api/...`, not `/api/v1/...`), which a real product would regret.
+
+## 5. State lifecycle and validation
 
 > "Enforce the following order state machine both on the frontend and backend… Orders can transition to [CANCELLED] only prior to entering [IN_PRODUCTION]. Invalid state jumps (e.g., [DRAFT] directly to [IN_PRODUCTION]) must be blocked with appropriate UI feedback and HTTP 400 API responses."
 
@@ -68,7 +101,7 @@ On the client, `orderActionsFor` returns the actions available to the current pe
 
 **Limits.** There is no re-open or rollback: `COMPLETED` and `CANCELLED` are terminal, and history is append-only. `expectedVersion` is optional on the request; when a client omits it the server uses the version it just read, which narrows the conflict window but does not close it the way a client-supplied version does.
 
-## 5. Concurrency and double-booking prevention
+## 6. Concurrency and double-booking prevention
 
 > "Implement distributed locking (e.g., Redis lock or optimistic DB locking) on the job assignment endpoint to ensure that when multiple installers accept a job simultaneously, exactly one installer is assigned."
 
@@ -100,7 +133,7 @@ MongoDB applies an update to one document atomically and serialises concurrent w
 
 **Limits.** The guarantee is per-document, which is all this problem needs; it would not extend to a claim that had to touch two documents atomically (that would need a transaction). Installer identity comes from the `x-persona` header, so "exactly one installer wins" is exactly one *claimed identity* — real auth would replace the header with a session lookup and nothing else about the lock would change. Note for the two-window demo: the `sc_persona` cookie only seeds a tab's first render (each tab then holds its persona in React state), so reloading the first window after setting the second will make it adopt the second's persona.
 
-## 6. The 3-minute automatic release
+## 7. The 3-minute automatic release
 
 > "Provide a fallback mechanism: if an installer claims a job but fails identity/payment verification within 3 minutes, release the lock automatically back to the marketplace."
 
@@ -109,7 +142,7 @@ MongoDB applies an update to one document atomically and serialises concurrent w
 **How.** The claim carries `expiresAt = now + CLAIM_TTL_MS` (default 180 000 ms — three minutes — overridable by env). There is no timer on Vercel to fire at T+3 min, so expiry is enforced by predicate rather than by a process, in three layers:
 
 1. **Every read.** `toPublicJob` maps a `CLAIMED` job whose `claim.expiresAt <= now` to `{status: 'OPEN', claim: null}`. Every job that leaves the server goes through `toJobDTO`, which calls it — REST responses, the bootstrap payload, and SSE frames alike. An expired claim is therefore never visible to any client.
-2. **Every write.** The claim filter in §5 already accepts `CLAIMED AND expired`, so a different installer can take the job the instant the window lapses, whether or not anything has swept the database.
+2. **Every write.** The claim filter in §6 already accepts `CLAIMED AND expired`, so a different installer can take the job the instant the window lapses, whether or not anything has swept the database.
 3. **A sweep, for visibility.** `releaseExpired()` flips lapsed claims to `OPEN` in the database and bumps `version`. It runs at the start of `GET /api/bootstrap` and again whenever a client connects to `GET /api/events`. That write is itself a change-stream event, so every *other* open dashboard sees the card flip back to Open live, with no one reloading. Correctness never depends on it running — it exists so the release is *observed*, not so it is *true*.
 
 On screen, one shared 1-second clock (`useNow`, seeded from `BootstrapDTO.serverTime` so server and client agree on the first render) drives the chip countdown on the card and the ring in the verification dialog. At zero the client renders the job as OPEN, which matches what the server would say.
@@ -126,7 +159,7 @@ Verification itself is a modal with **Verify** (→ ASSIGNED) and **Simulate fai
 
 **Limits.** Between the lapse and the next sweep the raw collection can still hold a `CLAIMED` document — harmless, because nothing reads or writes it without applying the predicate, but visible to anyone inspecting Atlas directly. A Vercel Pro cron or an Upstash QStash callback would make it eager (ADR-006). "Identity/payment verification" is simulated by two buttons; there is no verification provider.
 
-## 7. Async file upload simulation
+## 8. Async file upload simulation
 
 > "Simulate direct-to-cloud asset upload (e.g., 1GB+ print files) using pre-signed URLs. Display upload progress on the dashboard in real-time using WebSockets, Server-Sent Events (SSE), or optimistic UI updates without crashing HTTP nodes or repeatedly polling the database."
 
@@ -136,7 +169,9 @@ Verification itself is a modal with **Verify** (→ ASSIGNED) and **Simulate fai
 
 **How — progress without polling.** The uploader uses `XMLHttpRequest` (not `fetch`) precisely because it emits upload progress events. Those drive the local bar immediately. To reach *other* dashboards, the browser posts `bytesUploaded` to `POST /api/assets/:id/progress` at most every 2 seconds or every +5 % (`shouldReportProgress`) — roughly 20–30 small writes for a whole upload. Each write is a change-stream event that is fanned out over SSE as `asset.updated`, so a Vendor watching in another tab sees the same bar move. No client ever polls; no one queries the database on a timer. The uploading tab additionally shows throughput and time-left from `estimate()`, refreshed on a 120 ms cadence, because the server's coarse `progressPct` would look jerky to the person who started the upload.
 
-**How — 1 GB without a 1 GB file.** "Simulate large file" offers 100 MB / 1 GB / 2 GB. `simulatedSource` allocates one zero-filled 10 MiB buffer and hands out `Blob` views of it per part, so browser memory stays at a single part while the full size really is uploaded through the identical code path. The asset is flagged `simulated: true`; give the bucket a lifecycle rule expiring `simulated-*` objects after a day so the demo does not accumulate gigabytes of zeroes.
+**How — 1 GB without a 1 GB file.** "Simulate large file" offers 100 MB / 1 GB / 2 GB. `simulatedSource` allocates one zero-filled 10 MiB buffer and slices a `Blob` off it for each part, so the browser holds that one shared buffer plus whatever parts are in flight — four at a time, about 40 MiB — rather than the 1 GB it is uploading, and the bytes go up the identical code path. The asset is flagged `simulated: true` and named `simulated-1gb.bin`.
+
+Those objects are real and they accumulate. A lifecycle rule cannot target only them: keys are `orders/<orderId>/<assetId>/<file name>`, so `simulated-…` is the last segment and R2 lifecycle rules match by prefix. A rule on `orders/` would catch real uploads too; the alternative is deleting them by hand, with `pnpm tsx scripts/list-r2.ts` to see what is there.
 
 **How — failure paths.** A part is retried 3 times with exponential backoff. If it still fails, the uploader stops, calls the abort endpoint with `{"reason":"error"}`, and the asset lands `FAILED` so the row offers **Retry** (which re-uploads the same bytes as a fresh asset, without a second file picker). A user pressing ✕ sends the default reason and the asset lands `ABORTED`. Either way the R2 multipart is abandoned, so no orphaned parts accumulate. Uploads survive closing and reopening the detail sheet, because the uploaders live in a ref in `UploadsProvider`, above the panel that renders them.
 
@@ -148,9 +183,9 @@ Verification itself is a modal with **Verify** (→ ASSIGNED) and **Simulate fai
 - `tests/integration/routes.test.ts › POST /api/assets/:id/progress returns 204`.
 - Manual: README checklist steps 2 and 9. In devtools' Network tab, the PUTs go to `r2.cloudflarestorage.com`, not to the app.
 
-**Limits.** There is no resume across sessions: reloading mid-upload leaves the asset `UPLOADING` with a live R2 multipart, and the row offers Abort. Progress deliberately travels through the database, which is a write amplification that Redis pub/sub would avoid at the cost of a second datastore (ADR-016). The R2 bucket's CORS rule must expose `ETag` or the upload can never complete — see the README for the exact JSON and why.
+**Limits.** There is no resume across sessions: reloading mid-upload leaves the asset `UPLOADING` with a live R2 multipart, and the row offers Abort. Retry is bounded the same way: it re-uploads without a file picker only while this tab still holds the `File` handle (`sources` in `UploadsProvider`) or the asset was simulated, which can be recreated from its size alone; after a reload, Retry on a real file reopens the picker (`upload-panel.tsx` falls back to `fileInput.current?.click()`). Progress deliberately travels through the database, which is a write amplification that Redis pub/sub would avoid at the cost of a second datastore (ADR-016). The R2 bucket's CORS rule must expose `ETag` or the upload can never complete — see the README for the exact JSON and why.
 
-## 8. Realtime state changes (SSE over change streams)
+## 9. Realtime state changes (SSE over change streams)
 
 > "…in real-time using WebSockets, Server-Sent Events (SSE), or optimistic UI updates without crashing HTTP nodes or repeatedly polling the database." / "Build intuitive UI indicators for real-time state changes, active uploads, and job claiming statuses."
 
@@ -180,7 +215,7 @@ The visible indicators asked for are the connection dot in the header, the live 
 
 **Limits.** One change stream cursor per open dashboard tab. Atlas M0 allows 500 connections, so this is fine for a demo and is the first thing to change for scale: one shared stream per instance with in-memory fan-out on a long-lived host, or hosted pub/sub on Vercel (ADR-004). Streaming also requires Vercel Fluid compute; a proxy that buffers `text/event-stream` would push clients into degraded mode, which is exactly why degraded mode exists.
 
-## 9. Responsiveness
+## 10. Responsiveness
 
 > "Make the application responsive across mobile, tablet, and desktop views."
 
@@ -198,7 +233,33 @@ Which columns exist at all is a persona question, handled by the pure helpers in
 
 **Limits.** No drag-and-drop between columns — status changes go through the confirm dialog so the transition is explicit and auditable. The layout is verified by hand and by unit tests on the visibility rules; there are no visual-regression snapshots.
 
-## 10. Docker Compose — consciously dropped
+## 11. Code repository
+
+> "Create a public or private GitHub repository containing your full codebase, including containerized execution files (`docker-compose.yml` preferred)."
+
+**Where.** https://github.com/YosefHershberg/SignCraft — branch `main`, which is what Vercel deploys and what this document describes. The containerized-execution half of this deliverable is §12.
+
+**How.** The repository is the whole codebase, not an export of it: application code, Prisma schema and seed, both test suites, the specs the implementation was written from, and the docs. Nothing is vendored away and nothing is hidden behind a build artefact.
+
+```
+app/            pages and the eleven API route handlers
+components/     board, orders, jobs, uploads, layout, ui (Shadcn)
+lib/            domain (pure) · services (all DB access) · db · storage · realtime · upload · api · query · board · persona · hooks
+prisma/         schema.prisma, seed.ts
+scripts/        list-r2.ts — lists what is actually in the R2 bucket
+tests/          unit/ (no infrastructure) · integration/ (real Atlas) · helpers/
+docs/           architecture spec, 17 ADRs, UI pages-and-flows spec, design tokens
+README.md       schema, lock strategy, upload pipeline, trade-offs, QA checklist
+EXPLANATIONS.md this file
+```
+
+`.env` is not in the repository and never was (`.gitignore`); `.env.example` lists every variable with a comment. `README.md` › Quick start is the complete path from clone to running app.
+
+**Verify.** `git log --oneline` on `main`; `git ls-files | wc -l`; the live deployment (§14) is built from this branch.
+
+**Limits.** History is a working history, not a curated one: the specs were written first and the implementation follows them, so the commit log reads as phases rather than as a single feature per commit. There is no CI workflow — the gates (`pnpm test`, `pnpm typecheck`, `pnpm lint`) are run locally and by Vercel's build, not by GitHub Actions.
+
+## 12. Docker Compose — consciously dropped
 
 > "Create a public or private GitHub repository containing your full codebase, including containerized execution files (`docker-compose.yml` preferred)."
 
@@ -213,7 +274,7 @@ Pointing every environment at one MongoDB Atlas cluster instead makes local deve
 
 **What is lost.** There is no single `docker compose up` that boots the whole thing offline, and running locally requires credentials rather than nothing. **What is gained.** One database, one configuration, no container orchestration to debug, and a live deployment whose behaviour the test suite actually covers. If a container is required, the app is a stock Next.js 15 app with no local service dependencies: a standard Node image running `pnpm build && pnpm start` with the same `.env` is all it would take — the reason it was not included is that it would add a second, differently-configured path to keep honest, not that it would be hard.
 
-## 11. README requirements
+## 13. README requirements
 
 > "Architectural Spec & System Documentation: Include a `README.md` documenting your database schema, concurrency lock strategy and direct-to-cloud upload pipeline."
 
@@ -223,17 +284,17 @@ Pointing every environment at one MongoDB Atlas cluster instead makes local deve
 
 Deeper design material lives in `docs/superpowers/specs/`: the architecture design, 17 ADRs with the alternatives that were rejected, and the UI pages-and-flows spec. The README's "Trade-offs" section is the honest summary of those ADRs, including the ones amended during implementation.
 
-**Verify.** Every command printed in the README was run: `pnpm test` → 274 passed; `pnpm test:integration` → 47 passed; `pnpm vitest run --project integration tests/integration/jobs.test.ts` → 7 passed.
+**Verify.** Every command printed in the README was run: `pnpm test` → 284 passed; `pnpm typecheck` and `pnpm lint` → clean; `pnpm test:integration` → 47 passed, plus the asset-guard case added afterwards (`pnpm vitest run --project integration tests/integration/assets.test.ts` → 15 passed), which is the 48 the README quotes.
 
 **Limits.** The README documents the system as built; where an ADR was amended during implementation the amendment is recorded in `docs/superpowers/specs/2026-09-16-signcraft-decisions.md` rather than by rewriting the original decision.
 
-## 12. Live deployment
+## 14. Live deployment
 
 > "Deploy the application to a live platform (e.g., Vercel, Render, Railway, AWS) and provide the live deployment URL."
 
 **Live URL:** https://signcraft-blond.vercel.app
 
-**How.** Vercel with the Node runtime and Fluid compute (required for the streaming `/api/events`, which sets `maxDuration = 300`); build command `pnpm build`, which runs `prisma generate` before `next build`. The database is MongoDB Atlas M0, the same cluster used for local development. Object storage is Cloudflare R2, whose bucket CORS `AllowedOrigins` must include both `http://localhost:3000` and `https://signcraft-blond.vercel.app` (covered by `https://*.vercel.app`) or uploads fail at the preflight. Environment variables on Vercel are exactly the list in `.env.example`: `DATABASE_URL`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `NEXT_PUBLIC_APP_URL` (set to the deployed origin), and optionally `CLAIM_TTL_MS`.
+**How.** Vercel with the Node runtime and Fluid compute (required for the streaming `/api/events`, which sets `maxDuration = 300`); build command `pnpm build`, which runs `prisma generate` before `next build`. The database is MongoDB Atlas M0, the same cluster used for local development. Object storage is Cloudflare R2, whose bucket CORS `AllowedOrigins` must include both `http://localhost:3000` and `https://signcraft-blond.vercel.app` (covered by `https://*.vercel.app`) or uploads fail at the preflight. Environment variables on Vercel are exactly the list in `.env.example`: `DATABASE_URL`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `NEXT_PUBLIC_APP_URL` (set to the deployed origin, though no code reads it — it only documents which origin the bucket's CORS rule must allow), and optionally `CLAIM_TTL_MS`.
 
 **Verify.** Open the URL and run the README's manual QA checklist against it; it is written to work on a deployment whose seeded orders have already been moved around, which is why step 1 creates a fresh order.
 

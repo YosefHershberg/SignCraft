@@ -90,6 +90,14 @@ export function useRealtime(): ConnectionStatus {
   const stateRef = useRef<ConnectionState>({ status: getConnectionStatus(), failures: 0 });
   const lastIdRef = useRef<string | null>(null);
 
+  // The toast rule is the only thing here that depends on the persona. Reading
+  // it from a ref keeps it out of the effect's deps, so switching persona no
+  // longer tears down and reopens the EventSource.
+  const personaRef = useRef(persona);
+  useEffect(() => {
+    personaRef.current = persona;
+  }, [persona]);
+
   useEffect(() => {
     let es: EventSource | null = null;
     let closed = false;
@@ -118,11 +126,11 @@ export function useRealtime(): ConnectionStatus {
         }
         const ev = { type: name, doc } as SseEvent;
 
-        qc.setQueryData<BootstrapDTO>(keys.bootstrap, (old) => {
-          if (!old) return old;
-          if (shouldToastNewJob(old, ev, persona)) toast('A new job is open for installers');
-          return applyEvent(old, ev);
-        });
+        // Decided outside the updater: TanStack may call it more than once, and
+        // a cache updater that toasts would not be pure.
+        if (shouldToastNewJob(ev, personaRef.current)) toast('A new job is open for installers');
+
+        qc.setQueryData<BootstrapDTO>(keys.bootstrap, (old) => (old ? applyEvent(old, ev) : old));
       };
     }
 
@@ -166,7 +174,7 @@ export function useRealtime(): ConnectionStatus {
       clearTimeout(retryTimer);
       es?.close();
     };
-  }, [qc, persona]);
+  }, [qc]);
 
   return status;
 }

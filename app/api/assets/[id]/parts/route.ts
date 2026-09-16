@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 
 export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const id = await parseId(params);
-  requireKind(req, 'ops');
+  const persona = requireKind(req, 'ops');
   const body = await parseBody(req, partsSchema);
-  return json({ urls: await presignParts(id, body.partNumbers) });
+  return json({ urls: await presignParts(id, body.partNumbers, persona) });
 });

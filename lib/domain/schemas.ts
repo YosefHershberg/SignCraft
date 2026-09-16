@@ -61,7 +61,12 @@ export const abortSchema = z.object({
 export type AbortInput = z.infer<typeof abortSchema>;
 export type AbortReason = AbortInput['reason'];
 
+// Bounded so a hostile body cannot make the server build an unbounded part
+// list: S3/R2 allow at most 10 000 parts, and an ETag is a short quoted hash.
 export const completeSchema = z.object({
-  parts: z.array(z.object({ partNumber: z.number().int().min(1), etag: z.string().min(1) })).min(1),
+  parts: z
+    .array(z.object({ partNumber: z.number().int().min(1), etag: z.string().min(1).max(128) }))
+    .min(1)
+    .max(10_000),
 });
 export type CompleteInput = z.infer<typeof completeSchema>;

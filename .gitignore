@@ -7,5 +7,4 @@ coverage/
 next-env.d.ts
 *.tsbuildinfo
 .vercel
-/lib/generated
 .env.local

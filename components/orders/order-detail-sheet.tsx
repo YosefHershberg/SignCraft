@@ -54,8 +54,12 @@ export function OrderDetailSheet({
   // unmount the sheet before Radix could play its slide-out. The last order
   // shown is kept for exactly that closing frame; it is never used while open,
   // so nothing stale can be displayed.
+  // Written in an effect, not during render: a ref mutation in the render body
+  // is a side effect React may run twice (StrictMode) or throw away.
   const lastShown = useRef<OrderDTO | null>(null);
-  if (live) lastShown.current = live;
+  useEffect(() => {
+    if (live) lastShown.current = live;
+  }, [live]);
   const order = live ?? (open ? null : lastShown.current);
 
   // The order left the cache (deleted, or filtered out of a refetch): there is

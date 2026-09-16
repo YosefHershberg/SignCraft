@@ -98,6 +98,6 @@ export function applyEvent(data: BootstrapDTO, ev: SseEvent): BootstrapDTO {
   }
 }
 
-export function shouldToastNewJob(prev: BootstrapDTO, ev: SseEvent, persona: Persona): boolean {
+export function shouldToastNewJob(ev: SseEvent, persona: Persona): boolean {
   return persona.kind === 'installer' && ev.type === 'job.created';
 }

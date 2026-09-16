@@ -52,10 +52,17 @@ pnpm db:seed             # idempotent seed: 3 vendors, 4 installers, 8 orders â€
 
 ### Running integration tests
 
-They call `resetDb()` before each test, which wipes every collection. Always point them at a dedicated database on the same cluster:
+They call `resetDb()` before each test, which wipes every collection. Always point them at a dedicated database on the same cluster â€” the suite refuses to start unless the database name ends with `_test` (`tests/helpers/db-name.ts`; `ALLOW_DESTRUCTIVE_TESTS=1` overrides, do not):
 
 ```bash
 export DATABASE_URL="$(node -e "require('dotenv').config({path:'.env'});const u=process.env.DATABASE_URL;const [b,q]=u.split('?');process.stdout.write(b.replace(/\/signcraft$/,'/signcraft_test')+(q?'?'+q:''))")"
+pnpm test:integration
+```
+
+PowerShell:
+
+```powershell
+$env:DATABASE_URL = node -e "require('dotenv').config({path:'.env'});const u=process.env.DATABASE_URL;const [b,q]=u.split('?');process.stdout.write(b.replace(/\/signcraft$/,'/signcraft_test')+(q?'?'+q:''))"
 pnpm test:integration
 ```
 

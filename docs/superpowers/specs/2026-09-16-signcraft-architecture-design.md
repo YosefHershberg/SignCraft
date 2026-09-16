@@ -500,6 +500,8 @@ Seed (`prisma/seed.ts`, idempotent): 3 vendors, 4 installers, 8 orders spread ac
 
 Vercel: Node runtime for all API routes, Fluid compute on, `maxDuration` set on `/api/events`. Atlas: M0 free tier, IP allow-list `0.0.0.0/0` for Vercel egress (documented as demo-only). R2: bucket with the CORS rule and a 1-day lifecycle on `simulated-*` objects.
 
+**Amended 2026-09-16 — the `simulated-*` lifecycle rule is not implementable.** Objects are keyed `orders/<orderId>/<assetId>/<sanitised file name>` (`storageKeyFor`, `lib/storage/r2.ts`), so `simulated-1gb.bin` is the last path segment and an R2/S3 lifecycle rule — which matches by key *prefix* — can never single it out. The only rule that would fire is one on the `orders/` prefix, and that expires real uploads too. Either accept that (a demo bucket holds nothing worth keeping) or delete simulated objects by hand; `scripts/list-r2.ts` lists what is there. A key layout that put `simulated/` first would have made the rule possible and was not chosen.
+
 **Amended 2026-09-16:** build command is `pnpm build` (`prisma generate && next build`); `maxDuration = 300` is set on `/api/events`. R2 CORS `AllowedOrigins` must list both `http://localhost:3000` and the Vercel origin (`https://*.vercel.app` is acceptable), with `AllowedHeaders: ["*"]` and `ExposeHeaders: ["ETag"]` — omitting either breaks uploads in a different way (README, upload section). Windows note for local work: `pnpm build` can fail with `EPERM` on the Prisma query-engine DLL while `pnpm dev` holds it; stop the dev server first.
 
 ## 17. Out of scope (explicitly)

@@ -87,6 +87,14 @@ export function createSseStream(
 
       const run = async (token: string | null, resyncCount = 0): Promise<void> => {
         cursor = deps.watch(token);
+        // `cleanup` may have already run (abort/maxAge) while we were between
+        // cursors; it closed the *old* one, so close this one here or it leaks.
+        if (closed) {
+          const fresh = cursor;
+          cursor = null;
+          await fresh.close().catch(() => {});
+          return;
+        }
         try {
           for await (const change of cursor) {
             if (closed) return;
@@ -102,6 +110,7 @@ export function createSseStream(
             const stale = cursor;
             cursor = null;
             if (stale) await stale.close().catch(() => {});
+            if (closed) return; // aborted while the stale cursor was closing
             safeEnqueue('event: resync\ndata: {}\n\n');
             return run(null, resyncCount + 1);
           }

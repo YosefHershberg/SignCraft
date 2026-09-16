@@ -185,25 +185,23 @@ describe('applyEvent', () => {
 });
 
 describe('shouldToastNewJob', () => {
-  const data = bootstrap();
-
   it('is true for an installer persona on job.created', () => {
     const ev: SseEvent = { type: 'job.created', doc: job() };
-    expect(shouldToastNewJob(data, ev, { kind: 'installer', id: 'installer1' })).toBe(true);
+    expect(shouldToastNewJob(ev, { kind: 'installer', id: 'installer1' })).toBe(true);
   });
 
   it('is false for an ops persona on job.created', () => {
     const ev: SseEvent = { type: 'job.created', doc: job() };
-    expect(shouldToastNewJob(data, ev, { kind: 'ops' })).toBe(false);
+    expect(shouldToastNewJob(ev, { kind: 'ops' })).toBe(false);
   });
 
   it('is false for a vendor persona on job.created', () => {
     const ev: SseEvent = { type: 'job.created', doc: job() };
-    expect(shouldToastNewJob(data, ev, { kind: 'vendor', id: 'vendor1' })).toBe(false);
+    expect(shouldToastNewJob(ev, { kind: 'vendor', id: 'vendor1' })).toBe(false);
   });
 
   it('is false for an installer persona on job.updated', () => {
     const ev: SseEvent = { type: 'job.updated', doc: job() };
-    expect(shouldToastNewJob(data, ev, { kind: 'installer', id: 'installer1' })).toBe(false);
+    expect(shouldToastNewJob(ev, { kind: 'installer', id: 'installer1' })).toBe(false);
   });
 });

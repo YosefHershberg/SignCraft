@@ -189,6 +189,51 @@ describe('createSseStream', () => {
     expect(madeCursors.every((m) => m.state.closeCount === 1)).toBe(true);
   });
 
+  it('does not open a fresh cursor when the stream is aborted while the stale one is closing', async () => {
+    let releaseClose = () => {};
+    const closeGate = new Promise<void>((resolve) => {
+      releaseClose = resolve;
+    });
+    const state = { closeCount: 0 };
+    const badCursor: WatchCursor = {
+      close: async () => {
+        state.closeCount++;
+        await closeGate;
+      },
+      [Symbol.asyncIterator]() {
+        return {
+          next: async (): Promise<IteratorResult<ChangeLike>> => {
+            throw Object.assign(new Error('oplog window exceeded'), { code: 286 });
+          },
+        };
+      },
+    };
+
+    const watchCalls: (string | null)[] = [];
+    const watch = (token: string | null) => {
+      watchCalls.push(token);
+      return badCursor;
+    };
+    const deps: SseDeps = { watch, now: () => new Date(), heartbeatMs: 15_000, maxAgeMs: 280_000 };
+    const controller = new AbortController();
+    const stream = createSseStream(deps, 'token0', controller.signal);
+    const reader = stream.getReader();
+
+    await reader.read(); // : connected
+
+    // The resume error has fired and the stale cursor is mid-close: abort now.
+    await vi.waitFor(() => expect(state.closeCount).toBe(1));
+    controller.abort();
+    releaseClose();
+
+    const next = await reader.read();
+    expect(next.done).toBe(true); // no `event: resync` frame after the abort
+
+    // Let the aborted `run` finish unwinding before asserting it did not restart.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(watchCalls).toEqual(['token0']); // no second watch to leak
+  });
+
   it('propagates a non-resume watch error and closes the cursor without resyncing', async () => {
     const boom = new Error('boom');
     const { cursor, state } = makeThrowingCursor(boom);

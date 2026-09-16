@@ -107,7 +107,7 @@ describe('assets service', () => {
   it('presigns a URL per requested part number', async () => {
     const { result } = await createUploadingAsset();
 
-    const presigned = await presignParts(result.asset.id, [1, 2, 3]);
+    const presigned = await presignParts(result.asset.id, [1, 2, 3], OPS);
 
     expect(presigned).toHaveLength(3);
     expect(presigned).toEqual([
@@ -119,7 +119,7 @@ describe('assets service', () => {
   });
 
   it('presignParts 404s for a missing asset', async () => {
-    await expect(presignParts('507f1f77bcf86cd799439011', [1])).rejects.toMatchObject({
+    await expect(presignParts('507f1f77bcf86cd799439011', [1], OPS)).rejects.toMatchObject({
       status: 404,
       code: 'NOT_FOUND',
     });
@@ -129,7 +129,7 @@ describe('assets service', () => {
     const { result } = await createUploadingAsset();
     await prisma.asset.update({ where: { id: result.asset.id }, data: { status: 'UPLOADED' } });
 
-    await expect(presignParts(result.asset.id, [1])).rejects.toMatchObject({
+    await expect(presignParts(result.asset.id, [1], OPS)).rejects.toMatchObject({
       status: 409,
       code: 'VERSION_CONFLICT',
       details: { status: 'UPLOADED' },
@@ -157,7 +157,7 @@ describe('assets service', () => {
     await prisma.asset.update({ where: { id: result.asset.id }, data: { status: 'UPLOADED' } });
 
     await expect(
-      completeAsset(result.asset.id, [{ partNumber: 1, etag: 'e1' }])
+      completeAsset(result.asset.id, [{ partNumber: 1, etag: 'e1' }], OPS)
     ).rejects.toMatchObject({ status: 409, code: 'VERSION_CONFLICT', details: { status: 'UPLOADED' } });
 
     expect(storage.completeMultipart).not.toHaveBeenCalled();
@@ -166,11 +166,15 @@ describe('assets service', () => {
   it('completeAsset marks UPLOADED and calls completeMultipart with parts sorted by partNumber', async () => {
     const { order, result } = await createUploadingAsset();
 
-    const dto = await completeAsset(result.asset.id, [
-      { partNumber: 2, etag: 'e2' },
-      { partNumber: 1, etag: 'e1' },
-      { partNumber: 3, etag: 'e3' },
-    ]);
+    const dto = await completeAsset(
+      result.asset.id,
+      [
+        { partNumber: 2, etag: 'e2' },
+        { partNumber: 1, etag: 'e1' },
+        { partNumber: 3, etag: 'e3' },
+      ],
+      OPS
+    );
 
     expect(dto.status).toBe('UPLOADED');
     expect(dto.progressPct).toBe(100);
@@ -195,11 +199,35 @@ describe('assets service', () => {
     vi.mocked(storage.completeMultipart).mockRejectedValueOnce(new ApiError(502, 'STORAGE_ERROR'));
 
     await expect(
-      completeAsset(result.asset.id, [{ partNumber: 1, etag: 'e1' }])
+      completeAsset(result.asset.id, [{ partNumber: 1, etag: 'e1' }], OPS)
     ).rejects.toMatchObject({ status: 502, code: 'STORAGE_ERROR' });
 
     const db = await prisma.asset.findUniqueOrThrow({ where: { id: result.asset.id } });
     expect(db.status).toBe('FAILED');
+  });
+
+  it('rejects presign and complete once the order has moved past SUBMITTED mid-upload', async () => {
+    const { order, result } = await createUploadingAsset();
+    // The vendor accepts while the parts are still in flight.
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'VENDOR_ACCEPTED' } });
+
+    await expect(presignParts(result.asset.id, [1], OPS)).rejects.toMatchObject({
+      status: 400,
+      code: 'GUARD_FAILED',
+      details: { reason: 'ORDER_NOT_UPLOADABLE' },
+    });
+
+    await expect(completeAsset(result.asset.id, [{ partNumber: 1, etag: 'e1' }], OPS)).rejects.toMatchObject({
+      status: 400,
+      code: 'GUARD_FAILED',
+      details: { reason: 'ORDER_NOT_UPLOADABLE' },
+    });
+
+    expect(storage.presignPart).not.toHaveBeenCalled();
+    expect(storage.completeMultipart).not.toHaveBeenCalled();
+
+    const db = await prisma.asset.findUniqueOrThrow({ where: { id: result.asset.id } });
+    expect(db.status).toBe('UPLOADING'); // refused, not failed: Abort is still the way out
   });
 
   it('abortAsset marks ABORTED and calls abortMultipart', async () => {

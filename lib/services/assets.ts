@@ -60,13 +60,32 @@ export async function createAsset(
   return { asset: toAssetDTO(updated), uploadId, partSize: PART_SIZE, partCount };
 }
 
+/**
+ * Re-checks the *order* behind an in-flight upload against `checkUpload`, the
+ * same gate the create path uses. An upload started while the order was DRAFT
+ * outlives that status: the vendor can accept the order mid-upload, and without
+ * this the remaining parts would keep being signed and completed against an
+ * order that no longer accepts files. Throws the same 403/400 as `createAsset`.
+ */
+async function assertOrderStillUploadable(orderId: string, persona: Persona): Promise<void> {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw new ApiError(404, 'NOT_FOUND');
+
+  const verdict = checkUpload(persona, order.status);
+  if (!verdict.ok) throw fromVerdict(verdict);
+}
+
 /** Presigns URLs for the requested part numbers of an in-flight multipart upload. */
 export async function presignParts(
   assetId: string,
-  partNumbers: number[]
+  partNumbers: number[],
+  persona: Persona
 ): Promise<{ partNumber: number; url: string }[]> {
   const asset = await prisma.asset.findUnique({ where: { id: assetId } });
   if (!asset) throw new ApiError(404, 'NOT_FOUND');
+
+  await assertOrderStillUploadable(asset.orderId, persona);
+
   if ((asset.status !== 'PENDING' && asset.status !== 'UPLOADING') || !asset.uploadId) {
     throw new ApiError(409, 'VERSION_CONFLICT', { status: asset.status });
   }
@@ -102,10 +121,14 @@ export async function reportProgress(assetId: string, bytesUploaded: number): Pr
  */
 export async function completeAsset(
   assetId: string,
-  parts: { partNumber: number; etag: string }[]
+  parts: { partNumber: number; etag: string }[],
+  persona: Persona
 ): Promise<AssetDTO> {
   const asset = await prisma.asset.findUnique({ where: { id: assetId } });
   if (!asset) throw new ApiError(404, 'NOT_FOUND');
+
+  await assertOrderStillUploadable(asset.orderId, persona);
+
   if (asset.status !== 'UPLOADING' || !asset.uploadId) {
     throw new ApiError(409, 'VERSION_CONFLICT', { status: asset.status });
   }

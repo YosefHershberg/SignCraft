@@ -1,7 +1,12 @@
 import { prisma } from '@/lib/db/prisma';
 import type { Prisma } from '@prisma/client';
+import { assertTestDatabase } from './db-name';
+
+export { assertTestDatabase };
 
 export async function resetDb() {
+  // Deletes everything in the current database: refuse unless it is a *_test one.
+  assertTestDatabase();
   await prisma.asset.deleteMany();
   await prisma.installJob.deleteMany();
   await prisma.order.deleteMany();
