@@ -399,6 +399,8 @@ Browser (OPS)                       API (Vercel)                              R2
 
 "Simulate large file" (size selectable: 100 MB / 1 GB / 2 GB) creates the same Asset with `simulated: true` and `fileName: simulated-<size>.bin`. The client uploader's part source is a generator that yields `new Blob([sharedZeroBuffer])` per part, so browser memory stays at one part. Real bytes really land in R2 and the object is real; a reviewer can watch progress from another tab or persona. The assets list shows a "simulated" badge. An R2 lifecycle rule deletes `simulated-*` objects after 1 day to control storage cost.
 
+> **Amended 2026-09-16:** two claims above are superseded — objects are keyed `orders/<orderId>/<assetId>/<file>`, so a `simulated-*` lifecycle rule cannot match (see §16); and up to four part Blobs are in flight at once, so peak browser memory is about 40 MiB, not one part.
+
 ### 11.4 Rules
 
 - Uploads are allowed only while the order is `DRAFT` or `SUBMITTED` (400 otherwise).
