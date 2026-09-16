@@ -1,17 +1,31 @@
-import { ORDER_STATUSES, type OrderDTO } from '@/lib/domain/types';
-import { STATUS_META } from '@/lib/domain/status-meta';
+'use client';
 
-/** Desktop-only summary counts per status (UI spec §4.1). The wrapper stays
- * flex-1 at every width so the header's right-hand group keeps hugging the
- * right edge even when the pills themselves are hidden below xl. */
+import { mobileStatuses, visibleOrders } from '@/lib/board/visibility';
+import { STATUS_META } from '@/lib/domain/status-meta';
+import { ORDER_STATUSES, type OrderDTO } from '@/lib/domain/types';
+import { usePersona } from '@/lib/persona/persona-context';
+
+/**
+ * Desktop-only summary counts per status (UI spec §4.1). The counts mirror what
+ * the persona can actually see on the board — a vendor counts only their own
+ * orders — and an installer gets pills only for the two statuses that are
+ * columns for them, so the header agrees with the board instead of advertising
+ * work they cannot open. The wrapper stays flex-1 at every width so the
+ * header's right-hand group keeps hugging the right edge even when the pills
+ * themselves are hidden below xl.
+ */
 export function StatusSummaryPills({ orders }: { orders: OrderDTO[] }) {
-  const counts = ORDER_STATUSES.map((status) => ({
+  const { persona } = usePersona();
+  const visible = visibleOrders(orders, persona);
+  const statuses = persona.kind === 'installer' ? mobileStatuses(persona) : ORDER_STATUSES;
+
+  const counts = statuses.map((status) => ({
     status,
-    count: orders.filter((order) => order.status === status).length,
+    count: visible.filter((order) => order.status === status).length,
   }));
 
   return (
-    <div className="flex flex-1 items-center justify-center">
+    <div className="flex min-w-0 flex-1 items-center justify-center">
       <div className="hidden items-center gap-1.5 xl:flex">
         {counts.map(({ status, count }) => {
           const meta = STATUS_META[status];

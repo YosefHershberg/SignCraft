@@ -1,7 +1,14 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { useMutation, useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  skipToken,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import type { AssetDTO, BootstrapDTO, JobDTO, OrderDTO } from '@/lib/domain/types';
 import type {
   CompleteInput,
@@ -59,6 +66,20 @@ export function useBootstrap(initialData: BootstrapDTO): UseQueryResult<Bootstra
     staleTime: Infinity,
     refetchInterval: status === 'degraded' ? DEGRADED_POLL_MS : false,
   });
+}
+
+/**
+ * One order, read live out of the bootstrap cache, so an SSE frame re-renders
+ * the detail sheet without threading `orders` through props. `skipToken` makes
+ * this observer read-only — the dashboard still owns the fetching.
+ */
+export function useOrder(orderId: string | null): OrderDTO | null {
+  const { data } = useQuery<BootstrapDTO, Error, OrderDTO | null>({
+    queryKey: keys.bootstrap,
+    queryFn: skipToken,
+    select: (bootstrap) => bootstrap.orders.find((order) => order.id === orderId) ?? null,
+  });
+  return data ?? null;
 }
 
 // --- Mutations ---

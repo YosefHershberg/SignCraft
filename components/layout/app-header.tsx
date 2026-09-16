@@ -21,17 +21,18 @@ export function AppHeader({
   const { persona } = usePersona();
 
   return (
-    <header className="flex h-14 flex-none items-center gap-6 border-b border-slate-200 bg-white px-5">
-      <div className="flex items-baseline gap-2">
+    <header className="flex h-14 flex-none items-center gap-3 border-b border-slate-200 bg-white px-3 sm:gap-6 sm:px-5">
+      {/* The console name is the first thing to go below ~420px; the wordmark alone still identifies the app. */}
+      <div className="flex flex-none items-baseline gap-2">
         <span className="text-base font-bold tracking-[-0.02em] text-slate-900">SignCraft</span>
-        <span className="text-[11px] whitespace-nowrap text-slate-400">Ops console</span>
+        <span className="hidden text-[11px] whitespace-nowrap text-slate-400 sm:inline">Ops console</span>
       </div>
 
       <StatusSummaryPills orders={data.orders} />
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-none items-center gap-2 sm:gap-4">
         <ConnectionIndicator status={connectionStatus} />
-        <div className="h-6 w-px bg-slate-200" />
+        <div className="hidden h-6 w-px bg-slate-200 sm:block" />
         <PersonaSwitcher vendors={data.vendors} installers={data.installers} />
         {persona.kind === 'ops' && (
           <Button
