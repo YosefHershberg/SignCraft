@@ -4,3 +4,7 @@ node_modules/
 .env.*.local
 *.docx
 coverage/
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+/lib/generated
