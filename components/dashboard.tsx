@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { KanbanBoard } from '@/components/board/kanban-board';
+import { ClaimDialog } from '@/components/jobs/claim-dialog';
+import { VerificationDialog } from '@/components/jobs/verification-dialog';
 import { CreateOrderDialog } from '@/components/orders/create-order-dialog';
 import { OrderDetailSheet } from '@/components/orders/order-detail-sheet';
 import { TransitionDialog } from '@/components/orders/transition-dialog';
@@ -13,7 +15,7 @@ import { keys } from '@/lib/query/keys';
 import { useNow } from '@/lib/hooks/use-now';
 import { useRealtime } from '@/lib/realtime/use-realtime';
 import { usePersona } from '@/lib/persona/persona-context';
-import type { BootstrapDTO, OrderAction, OrderDTO, OrderStatus, Persona } from '@/lib/domain/types';
+import type { BootstrapDTO, JobDTO, OrderAction, OrderDTO, OrderStatus, Persona } from '@/lib/domain/types';
 
 /** How long a card keeps its highlight ring after moving column (UI spec §4.2). */
 const HIGHLIGHT_MS = 600;
@@ -42,6 +44,10 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderAction } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  // Both installer dialogs are keyed by order id, not by a captured JobDTO, so
+  // an SSE frame (someone else's claim, a lapsed TTL) re-renders them live.
+  const [claimOrderId, setClaimOrderId] = useState<string | null>(null);
+  const [verifyOrderId, setVerifyOrderId] = useState<string | null>(null);
 
   const board = data ?? initialData;
   const now = useNow(Date.parse(board.serverTime));
@@ -55,6 +61,12 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
     (order: OrderDTO, action: OrderAction) => setPendingAction({ orderId: order.id, action }),
     []
   );
+
+  const onClaim = useCallback((job: JobDTO) => setClaimOrderId(job.orderId), []);
+  const onVerify = useCallback((job: JobDTO) => setVerifyOrderId(job.orderId), []);
+
+  const claimJob = board.orders.find((o) => o.id === claimOrderId)?.installJob ?? null;
+  const verifyJob = board.orders.find((o) => o.id === verifyOrderId)?.installJob ?? null;
 
   /**
    * A claim lapsed: refetch so the server's lazy expiry reconciles. The mobile
@@ -85,6 +97,8 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
         highlightIds={highlightIds}
         selectedOrderId={selectedOrderId}
         loading={!data}
+        onVerify={onVerify}
+        onClaim={onClaim}
         onClaimExpired={onClaimExpired}
       />
 
@@ -108,7 +122,36 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
         installers={board.installers}
         persona={persona}
         now={now}
+        onClaim={onClaim}
+        onVerify={onVerify}
       />
+
+      {claimJob && (
+        <ClaimDialog
+          open
+          onOpenChange={(open) => !open && setClaimOrderId(null)}
+          job={claimJob}
+          persona={persona}
+          installers={board.installers}
+          now={now}
+          // The claim dialog closes itself first; this only hands the won claim
+          // straight to the verification countdown (UI spec §7.1 step 7).
+          onClaimed={(job) => {
+            setClaimOrderId(null);
+            setVerifyOrderId(job.orderId);
+          }}
+        />
+      )}
+
+      {verifyJob && (
+        <VerificationDialog
+          open
+          onOpenChange={(open) => !open && setVerifyOrderId(null)}
+          job={verifyJob}
+          persona={persona}
+          now={now}
+        />
+      )}
 
       {pendingAction && pendingOrder && (
         <TransitionDialog

@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { formatCountdown } from '@/lib/domain/format';
 import { cn } from '@/lib/utils';
 
@@ -18,15 +19,17 @@ export function ClaimCountdown({
   expiresAt,
   now,
   className,
+  style,
 }: {
   expiresAt: string;
   now: number;
   className?: string;
+  style?: CSSProperties;
 }) {
   const remaining = Math.max(0, new Date(expiresAt).getTime() - now);
 
   return (
-    <span className={cn('font-mono font-semibold tabular-nums', className)}>
+    <span className={cn('font-mono font-semibold tabular-nums', className)} style={style}>
       {formatCountdown(Math.ceil(remaining / 1000) * 1000)}
     </span>
   );

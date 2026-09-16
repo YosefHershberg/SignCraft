@@ -24,6 +24,7 @@ export interface KanbanBoardProps {
   loading?: boolean;
   onAction?: OrderCardProps['onAction'];
   onVerify?: OrderCardProps['onVerify'];
+  onClaim?: OrderCardProps['onClaim'];
   onClaimExpired?: OrderCardProps['onClaimExpired'];
 }
 
@@ -51,6 +52,7 @@ export function KanbanBoard({
   loading,
   onAction,
   onVerify,
+  onClaim,
   onClaimExpired,
 }: KanbanBoardProps) {
   const [expandedCancelled, setExpandedCancelled] = useState(false);
@@ -68,7 +70,7 @@ export function KanbanBoard({
   if (seeded !== tabState) setTabState(seeded);
   const tab = seeded.status;
 
-  const card: CardBinding = { persona, installers, now, onAction, onVerify, onClaimExpired };
+  const card: CardBinding = { persona, installers, now, onAction, onVerify, onClaim, onClaimExpired };
   const emptyLabel = persona.kind === 'vendor' ? 'No orders for you here' : undefined;
   const ordersIn = (status: OrderStatus) => visible.filter((order) => order.status === status);
   const gridLayout = persona.kind === 'installer';

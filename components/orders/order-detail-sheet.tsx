@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import type { InstallerDTO, OrderAction, OrderDTO, Persona, VendorDTO } from '@/lib/domain/types';
+import { JobPanel } from '@/components/jobs/job-panel';
+import type { InstallerDTO, JobDTO, OrderAction, OrderDTO, Persona, VendorDTO } from '@/lib/domain/types';
 import { useOrder } from '@/lib/query/hooks';
 import { DetailsGrid } from './details-grid';
 import { HistoryTimeline } from './history-timeline';
@@ -21,6 +22,9 @@ export interface OrderDetailSheetProps {
   persona: Persona;
   /** Epoch ms for claim-sensitive guards; defaults to the current clock. */
   now?: number;
+  /** Installer job actions (Task 14); the dashboard owns the dialogs. */
+  onClaim?: (job: JobDTO) => void;
+  onVerify?: (job: JobDTO) => void;
 }
 
 /**
@@ -39,6 +43,8 @@ export function OrderDetailSheet({
   installers,
   persona,
   now = Date.now(),
+  onClaim,
+  onVerify,
 }: OrderDetailSheetProps) {
   const order = useOrder(orderId);
   const missing = open && orderId !== null && order === null;
@@ -94,7 +100,17 @@ export function OrderDetailSheet({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <OrderActions order={order} persona={persona} now={now} onAction={onAction} />
 
-          {/* JobPanel slot (Task 14) — install job state, claim countdown, installer actions. */}
+          <JobPanel
+            order={order}
+            persona={persona}
+            installers={installers}
+            now={now}
+            onClaim={onClaim ?? (() => {})}
+            onVerify={onVerify ?? (() => {})}
+            // Complete is an order transition, so it goes through the dashboard's
+            // existing pending-action state and the standard TransitionDialog.
+            onComplete={(target) => onAction(target, 'complete')}
+          />
 
           <DetailsGrid order={order} vendorName={vendorName} />
 

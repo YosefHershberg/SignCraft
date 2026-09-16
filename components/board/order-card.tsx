@@ -1,5 +1,6 @@
 'use client';
 
+import { ClaimButton } from '@/components/jobs/claim-button';
 import { JobChip } from '@/components/jobs/job-chip';
 import { UploadProgressBar } from '@/components/uploads/upload-progress-bar';
 import {
@@ -27,6 +28,8 @@ export interface OrderCardProps {
   /** Task 13 wires the overflow menu; without it the ⋯ button is not rendered. */
   onAction?: (order: OrderDTO, action: OrderAction) => void;
   onVerify?: (job: JobDTO) => void;
+  /** Opens the claim dialog from the card's own Claim button (design 1b). */
+  onClaim?: (job: JobDTO) => void;
   /** Fired once per lapsed claim, keyed `<jobId>:<expiresAt>` so the board can dedupe. */
   onClaimExpired?: (key: string) => void;
 }
@@ -43,6 +46,7 @@ export function OrderCard({
   selected,
   onAction,
   onVerify,
+  onClaim,
   onClaimExpired,
 }: OrderCardProps) {
   const meta = STATUS_META[order.status];
@@ -110,7 +114,7 @@ export function OrderCard({
         )}
 
         {showJob && order.installJob && (
-          <div className="mt-0.5 flex">
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
             <JobChip
               job={order.installJob}
               persona={persona}
@@ -119,6 +123,16 @@ export function OrderCard({
               onVerify={onVerify}
               onExpire={onClaimExpired}
             />
+            {onClaim && (
+              <ClaimButton
+                job={order.installJob}
+                persona={persona}
+                installers={installers}
+                now={now}
+                onClaim={onClaim}
+                compact
+              />
+            )}
           </div>
         )}
 

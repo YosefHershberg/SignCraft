@@ -10,7 +10,7 @@ import { SkeletonCard } from './skeleton-card';
 /** Everything a column needs to hand each card, minus the order itself. */
 export type CardBinding = Pick<
   OrderCardProps,
-  'persona' | 'installers' | 'now' | 'onAction' | 'onVerify' | 'onClaimExpired'
+  'persona' | 'installers' | 'now' | 'onAction' | 'onVerify' | 'onClaim' | 'onClaimExpired'
 >;
 
 export interface StatusColumnProps {
