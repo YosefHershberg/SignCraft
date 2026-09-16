@@ -82,6 +82,7 @@ export class MultipartUploader {
     this.lastReported = { at: this.startedAt, pct: 0 };
 
     const partNumbers = Array.from({ length: this.opts.plan.partCount }, (_, i) => i + 1);
+    let completed = false;
 
     try {
       for (let i = 0; i < partNumbers.length; i += this.batch) {
@@ -99,19 +100,34 @@ export class MultipartUploader {
       // Completion (final progress report + complete) is part of the same
       // failure domain as the upload itself: a rejection here must still
       // land in the failed/onError/api.abort path below, not escape as an
-      // unhandled rejection with `state` stuck at 'running'.
+      // unhandled rejection with `state` stuck at 'running'. `abort()` can
+      // still land while either of these is in flight, so re-check after
+      // each await rather than assuming nothing changed underneath us.
       await this.opts.api.progress(this.opts.assetId, this.opts.sizeBytes);
+      if (this.aborting) return;
       const parts = Array.from(this.etags.entries())
         .sort(([a], [b]) => a - b)
         .map(([partNumber, etag]) => ({ partNumber, etag }));
       await this.opts.api.complete(this.opts.assetId, parts);
-      this._state = 'done';
-      this.opts.onDone?.();
+      if (this.aborting) return;
+      completed = true;
     } catch (err) {
       if (this.aborting) return;
       this._state = 'failed';
       await this.opts.api.abort(this.opts.assetId).catch(() => {});
       this.opts.onError?.(err instanceof Error ? err : new Error(String(err)));
+      return;
+    }
+
+    // Deliberately outside the try/catch above: a throwing `onDone` must not
+    // be mistaken for an upload failure (it would otherwise flip a finished
+    // upload to 'failed' and call `api.abort` on work that already
+    // succeeded). `state` is set to 'done' before `onDone` runs, so that is
+    // true regardless of whether `onDone` throws; the throw itself is left
+    // to propagate out of `start()` rather than being swallowed.
+    if (completed) {
+      this._state = 'done';
+      this.opts.onDone?.();
     }
   }
 

@@ -220,4 +220,76 @@ describe('MultipartUploader', () => {
     expect(api.abort).toHaveBeenCalledTimes(1);
     expect(api.abort).toHaveBeenCalledWith('asset-7');
   });
+
+  it('(h) a throwing onDone does not flip a completed upload to failed', async () => {
+    const plan = planParts(3, 1);
+    const api = makeApi();
+    const put = immediatePut();
+    const onError = vi.fn();
+    const onDone = vi.fn(() => {
+      throw new Error('onDone boom');
+    });
+
+    const uploader = new MultipartUploader({
+      assetId: 'asset-8',
+      sizeBytes: 3,
+      plan,
+      source: () => new Blob([new Uint8Array(1)]),
+      api,
+      put,
+      sleep: noopSleep,
+      onError,
+      onDone,
+    });
+
+    // `state` must already be 'done' before onDone runs, so its throw
+    // (deliberately left to propagate, not swallowed) does not change that.
+    await expect(uploader.start()).rejects.toThrow('onDone boom');
+
+    expect(uploader.state).toBe('done');
+    expect(onError).not.toHaveBeenCalled();
+    expect(api.abort).not.toHaveBeenCalled();
+  });
+
+  it('(i) abort() during a pending api.complete() finishes as aborted, not done', async () => {
+    const plan = planParts(3, 1);
+    let resolveComplete: () => void = () => {};
+    const completePending = new Promise<void>((resolve) => {
+      resolveComplete = resolve;
+    });
+    const api = makeApi({ complete: vi.fn(() => completePending) });
+    const put = immediatePut();
+    const onDone = vi.fn();
+    const onAborted = vi.fn();
+
+    const uploader = new MultipartUploader({
+      assetId: 'asset-9',
+      sizeBytes: 3,
+      plan,
+      source: () => new Blob([new Uint8Array(1)]),
+      api,
+      put,
+      sleep: noopSleep,
+      onDone,
+      onAborted,
+    });
+
+    const started = uploader.start();
+
+    // Flush microtasks until api.complete has actually been called (and is
+    // now pending on `completePending`), without depending on a fixed tick
+    // count for the await chain above it.
+    for (let i = 0; i < 50 && (api.complete as ReturnType<typeof vi.fn>).mock.calls.length === 0; i++) {
+      await Promise.resolve();
+    }
+    expect(api.complete).toHaveBeenCalledTimes(1);
+
+    uploader.abort();
+    resolveComplete();
+    await started;
+
+    expect(uploader.state).toBe('aborted');
+    expect(onDone).not.toHaveBeenCalled();
+    expect(onAborted).toHaveBeenCalledTimes(1);
+  });
 });
