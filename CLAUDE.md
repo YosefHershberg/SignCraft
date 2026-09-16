@@ -38,12 +38,12 @@ See architecture spec §13. Short version: `app/` (pages + `api/` routes), `comp
 ## Commands (once implemented)
 
 ```
-pnpm dev                 # needs docker compose up mongo (replica set) + .env
+pnpm dev                 # needs .env with the Atlas DATABASE_URL
 pnpm test                # unit, no infra
-pnpm test:integration    # needs the compose Mongo; runs claim race etc.
+pnpm test:integration    # hits Atlas (use a dedicated DB name via DATABASE_URL); runs claim race etc.
 pnpm prisma db push      # schema sync (Mongo has no migrations)
 pnpm prisma db seed      # idempotent seed: 3 vendors, 4 installers, 8 orders
-docker compose up        # app + mongo, seeded, on :3000
+docker compose up        # app container against Atlas, seeded on start, on :3000
 ```
 
 ## Working conventions
