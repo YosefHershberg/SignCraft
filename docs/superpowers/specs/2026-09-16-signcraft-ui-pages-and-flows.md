@@ -2,7 +2,7 @@
 # SignCraft — UI Pages & Flows (Stitch handoff)
 
 **Date:** 2026-09-16
-**Status:** Approved
+**Status:** Implemented. Paragraphs marked **Amended 2026-09-16** record where the built UI differs from the approved text and are authoritative over the text around them; most reconcile this document with the Claude Design exports (`docs/design/screens/1a`–`1h`), which were produced after it.
 **Audience:** Stitch (screen design), then the implementer
 **Companion docs:** [Architecture](2026-09-16-signcraft-architecture-design.md) · [Decisions](2026-09-16-signcraft-decisions.md)
 **Visual design:** [docs/design](../../design/) ([DESIGN.md](../../design/DESIGN.md) tokens plus Claude Design exports). This document is the source of truth for behaviour; the design covers visuals only.
@@ -61,6 +61,7 @@ One dashboard, one persona active at a time, switchable from the header. The app
 |---|---|---|
 | Mobile | < 768 px | Status tabs (horizontally scrollable pills) above a single-column card list. Detail opens as a full-screen sheet. |
 | Tablet | 768–1279 px | Kanban with horizontal scroll and scroll-snap per column; 2.5 columns visible. Detail opens as a right sheet, 90 % width. |
+| | | **Amended 2026-09-16:** columns are 280 px with a 12 px gap, so about **3.5 columns** are visible at 1024 px, matching design 1h. Wider than 2.5 reads as a board rather than as a broken layout, and still cuts the fourth column mid-card so it is obvious the row continues. |
 | Desktop | ≥ 1280 px | Full Kanban, 6 columns visible, Cancelled collapsed as a thin rail on the far right. Detail opens as a right sheet, 480 px. |
 
 ## 4. Screens
@@ -86,6 +87,8 @@ Columns left to right: Draft, Submitted, Accepted, In production, Ready for inst
 
 **Column header:** status colour dot, label, count badge. Ops sees all orders; Vendor sees only their orders (empty columns show "No orders for you here"); Installer sees only the Ready for install and Completed columns expanded, others collapsed to rails with counts (they cannot act there).
 
+**Amended 2026-09-16:** an installer's **Completed** column shows only the orders *they* installed — it is their own history ("Completed · your installs", design 1b), not every finished job in the marketplace. Ready for install stays the full open marketplace, since that is what they compete for. Implemented in `visibleOrders` (`lib/board/visibility.ts`), tested in `tests/unit/board/visibility.test.ts`.
+
 **Order card** (the central component):
 ```
 ┌─────────────────────────────────────────┐
@@ -109,6 +112,7 @@ Columns left to right: Draft, Submitted, Accepted, In production, Ready for inst
 ### 4.3 Dashboard (mobile)
 
 - Status tabs as horizontally scrollable pills with counts; default tab is the first non-empty status for the persona.
+- **Amended 2026-09-16:** an installer gets tabs only for **Ready for install** and **Completed** — the statuses that are full columns for them on desktop (`mobileStatuses` in `lib/board/visibility.ts` derives the tabs from `columnMode`, so the two layouts cannot disagree). Ops and vendors still get all seven. Their **Completed** tab, like the desktop column, lists only their own installs.
 - Card list, full width, same card anatomy but the vendor/due row wraps.
 - FAB "＋" for Ops.
 - Pull-to-refresh is not needed; the connection indicator lives in the header as a dot only.
@@ -124,9 +128,15 @@ Right sheet (desktop/tablet) or full-screen (mobile). Sections top to bottom:
 5. **Assets panel:** list of assets with name, size, status badge, progress bar (live), and per-asset Abort (while uploading). For Ops in Draft/Submitted: "Upload file" and "Simulate large file" buttons.
 6. **History timeline:** vertical list, newest first: "Submitted by Ops · 12:04", "Accepted by Acme Signs · 12:20", each with the status colour dot.
 
+**Amended 2026-09-16 — section order follows design 1c:** header → **actions bar** → **install job panel** → **details grid** → **assets panel** → history. The job panel moves above the details because in Ready for install it is the only thing anyone is there to act on, and a 3-minute countdown must not be below the fold on a 480 px sheet. The details grid is reference material and reads fine underneath it. The sheet is also **non-modal** (`modal={false}`): see §7.8 and ADR-013's amendment.
+
+The details grid renders in the order Sign type · Size · Quantity · Install address · Due date · Vendor · Notes (Notes spans both columns).
+
 ### 4.5 Create Order dialog (Ops)
 
-Fields, in order: Title, Customer name, Sign type (select), Width cm, Height cm, Quantity, Vendor (select), Install address, Due date (date picker), Notes (textarea, optional). Validation inline on blur; submit button "Create draft". On success: dialog closes, new card appears in Draft with the highlight ring, toast "Order SC-0043 created".
+Fields, in order: Title, Customer name, Sign type (select), Width cm, Height cm, Quantity, Vendor (select), Install address, Due date (date picker), Notes (textarea, optional).
+
+**Amended 2026-09-16 — field order follows design 1e:** Title · Customer name · Sign type · Width cm · Height cm · Quantity · **Vendor · Due date · Install address** · Notes. Vendor and Due date sit side by side as a two-up row (both short), which leaves Install address a full-width row of its own — it is the longest value in the form and wraps badly in half a column. Validation inline on blur; submit button "Create draft". On success: dialog closes, new card appears in Draft with the highlight ring, toast "Order SC-0043 created".
 
 ### 4.6 Transition confirm dialog (all personas)
 
@@ -249,6 +259,8 @@ Reviewer blocks `/api/events` (devtools). Indicator goes Reconnecting, then Degr
 ### 7.8 Persona switch mid-view
 
 Switching persona while the sheet is open keeps the sheet open and re-renders its action bar for the new persona. The board re-filters with a quick crossfade.
+
+**Amended 2026-09-16 — how this is achieved, and what it costs.** The sheet renders with `modal={false}`, so there is no pointer-blocking overlay and the header's persona switcher stays reachable while it is open. That is what makes a single-window walkthrough possible (Ops submits, switch to the vendor, accept — same sheet, same order). The trade: no focus trap, so the board behind the sheet stays in the tab order. Focus is still returned to the trigger on close (`components/orders/use-restore-focus.ts`). Recorded as an amendment to ADR-013.
 
 ## 8. Stitch generation notes
 

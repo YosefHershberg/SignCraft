@@ -1,10 +1,12 @@
 # SignCraft — Architecture Decision Records
 
 **Date:** 2026-09-16
-**Status:** Accepted
-**Companion docs:** [Architecture](2026-09-16-signcraft-architecture-design.md) · [UI Pages & Flows](2026-09-16-signcraft-ui-pages-and-flows.md)
+**Status:** Accepted, with the amendments recorded below
+**Companion docs:** [Architecture](2026-09-16-signcraft-architecture-design.md) · [UI Pages & Flows](2026-09-16-signcraft-ui-pages-and-flows.md) · [README](../../../README.md) · [EXPLANATIONS](../../../EXPLANATIONS.md)
 
 Each record: context, decision, alternatives considered, consequences. Records are numbered in the order the decisions were made; later records assume earlier ones. The README's "Trade-offs" section is derived from the Consequences here.
+
+Decisions made or changed during implementation are appended to the record they affect as an **Amended 2026-09-16** paragraph, and new decisions are added as ADR-018 onward. Original text is never rewritten, so the reasoning that was superseded stays readable.
 
 ---
 
@@ -40,6 +42,8 @@ Each record: context, decision, alternatives considered, consequences. Records a
 
 **Consequences.** No WebSockets, no in-process state, no background worker, no long-lived change stream. Every later decision on realtime (ADR-004), locking (ADR-005), and expiry (ADR-006) is shaped by this. The docker-compose file is for local execution, not a mirror of production.
 
+**Amended 2026-09-16 — Atlas everywhere, Docker dropped.** The last sentence above turned out to be the problem rather than the plan: a compose Mongo is not a mirror of production, so anything proven against it (especially change-stream behaviour, which needs `--replSet rs0`, an `rs.initiate()` init container and a PRIMARY healthcheck) would have to be re-proven on Atlas anyway, while the reviewer's compose data and the deployed data diverged. Every Docker artifact was therefore removed and **one Atlas M0 cluster now serves every environment**, with integration tests on a dedicated database name on the same cluster. Consequences: local and deployed behaviour are identical and the integration suite exercises the production configuration; the reviewer's setup is `.env` + `pnpm dev` rather than `docker compose up`; there is no offline/credential-free way to run the app locally, and the deliverable's "containerized execution files (docker-compose.yml preferred)" is knowingly unmet — stated plainly in EXPLANATIONS.md §10. The app has no local service dependencies, so a stock Node image running `pnpm build && pnpm start` would containerise it if required; it was left out rather than kept as a second, differently-configured path to maintain.
+
 ## ADR-004 — Realtime via SSE backed by MongoDB Change Streams
 
 **Context.** Dashboard must show state changes, claim status, and upload progress live, "without repeatedly polling the database". On Vercel a long-lived socket is only possible as a streaming function invocation.
@@ -56,6 +60,8 @@ Each record: context, decision, alternatives considered, consequences. Records a
 - Vercel Fluid compute must be on and `maxDuration` set on the route.
 - A degraded mode (10 s refetch) exists only when SSE fails three times in a row, so the app still works if a proxy blocks streaming.
 
+**Amended 2026-09-16 — resync and explicit reopen.** Two mechanisms were added during implementation. (1) `event: resync`: a change stream can lose its resume token (Mongo 286 `ChangeStreamHistoryLost`, or 280 for an invalid token), which the original design had no answer for; the server now restarts the cursor from now and tells the client to refetch the bootstrap, giving up after `MAX_RESYNCS = 3` rather than looping. (2) The client reopens the stream itself with `?after=<lastEventId>` instead of relying on the browser: `EventSource` only auto-retries transport failures, and an HTTP error status — exactly what `/api/events` returns when the change stream dies — is fatal by spec, so without our own retry the app would sit on "Reconnecting…" forever and never reach the three failures that enable degraded polling. Also: the change-stream `$match` covers `insert | update | replace` only, since nothing deletes and a delete change carries no `fullDocument`.
+
 ## ADR-005 — Double-booking prevention with a MongoDB atomic conditional update (optimistic DB locking)
 
 **Context.** Spec asks for distributed locking, "e.g., Redis lock or optimistic DB locking". Exactly one installer must win concurrent claims.
@@ -68,6 +74,8 @@ Each record: context, decision, alternatives considered, consequences. Records a
 - Multi-document transaction: unnecessary; the race is on one document.
 
 **Consequences.** Zero extra infrastructure. The guarantee is testable in-process with 50 parallel calls. A `version` counter on every mutable document extends the same optimistic pattern to order transitions (409 `VERSION_CONFLICT`).
+
+**Amended 2026-09-16 — the Prisma path held.** The design kept `prisma.$runCommandRaw({ findAndModify })` in reserve in case Prisma's composite-type filter (`claim: { is: { expiresAt: { lt: now } } }`) misbehaved on the Mongo connector. It did not; `claimJob` is the plain `updateMany` and the raw fallback was never written. The implemented update also clears `installerId` (so a job re-claimed after a failed verification carries no stale assignee) and, on `count !== 1`, reads the job once to return 404 `NOT_FOUND` rather than 409 `CLAIM_TAKEN` for an id that does not exist. Proven by `tests/integration/jobs.test.ts › exactly one of 50 concurrent claims wins`, run against Atlas.
 
 ## ADR-006 — 3-minute claim release via lazy expiry plus on-demand sweep
 
@@ -94,6 +102,8 @@ Each record: context, decision, alternatives considered, consequences. Records a
 - Fully mocked storage: cheapest, but a reviewer would see nothing real happen.
 
 **Consequences.** Real objects land in R2 (lifecycle rule deletes simulated ones after a day). Bucket needs a CORS rule exposing `ETag`. R2 is mocked at the `lib/storage/r2.ts` boundary in tests.
+
+**Amended 2026-09-16 — the abort endpoint carries a reason.** `POST /api/assets/:id/abort` takes an optional `{ reason?: 'user' | 'error' }`. The uploader calls the same endpoint from two places — the user pressing ✕, and its own give-up path after 3 failed part retries — and only the caller knows which happened. `'error'` records the asset **FAILED** so the row offers Retry (UI spec §7.6); the default `'user'` records **ABORTED**, which offers nothing. The body is optional so a bare `POST` (curl, `navigator.sendBeacon`) still means a user abort. Either way the R2 multipart is abandoned, so no orphaned parts accumulate. A failure inside `createAsset` keeps the row and marks it FAILED rather than deleting it, for the same reason.
 
 ## ADR-008 — Persona switcher instead of authentication
 
@@ -157,6 +167,10 @@ Each record: context, decision, alternatives considered, consequences. Records a
 
 **Consequences.** Realtime changes are visually obvious (cards move). Column widths need care at tablet size (horizontal scroll with snap).
 
+**Amended 2026-09-16 — the detail sheet is non-modal.** `components/orders/order-detail-sheet.tsx` renders with `modal={false}`, i.e. without a pointer-blocking overlay. A modal sheet makes the header unreachable, which would break the flow the whole demo rests on: switching persona while the sheet is open and keeping it open (UI spec §7.8), so one window can drive an order through two personas. The cost is no focus trap — the board behind stays in the tab order — partially offset by restoring focus to the trigger on close (`use-restore-focus.ts`). Alternatives: a modal sheet plus a persona control duplicated inside it (more UI, same problem elsewhere); closing and reopening the sheet on every persona switch (loses scroll position and in-progress state).
+
+**Amended 2026-09-16 — one shared clock, board-wide re-render.** Every countdown (card chip, job panel, verification ring) reads a `now` prop threaded down from a single `useNow()` 1 s interval rather than owning a timer. The consequence is that the whole board re-renders once per second whenever any claim is counting down. Accepted at demo scale (eight orders, at most one live claim); a real board would memoise the countdown subtree or run the animation in CSS. The alternative — a timer per chip — trades the re-render for N unsynchronised intervals whose digits visibly disagree.
+
 ## ADR-014 — Prisma 6 for CRUD, native driver only for change streams
 
 **Context.** The task mandates Prisma with MongoDB. Prisma does not expose `watch()`.
@@ -177,6 +191,8 @@ Each record: context, decision, alternatives considered, consequences. Records a
 
 **Consequences.** Claim logic and its test touch one small document. Bootstrap does one `include` to join jobs and assets.
 
+**Amended 2026-09-16 — how `orderNumber` is generated.** Human-readable order numbers (`SC-0001`) were needed and the ADR never said where they come from. `createOrder` does `prisma.order.count()` then `create`, with a single retry at `count + 2` when the unique index rejects the first attempt (`P2002`). This is a read-then-write and is *not* safe under heavy concurrent creation — deliberately different from the claim, which is contended and therefore atomic. Order creation is a one-at-a-time human action by a single Ops persona, and the unique index means a collision fails loudly rather than duplicating. The proper fixes, if it ever mattered: a counters collection updated with `$inc` in one `findAndModify`, or a random suffix instead of a sequence. Covered by `tests/integration/orders.test.ts › retries once on an orderNumber collision`.
+
 ## ADR-016 — Upload progress reaches other dashboards through throttled DB writes
 
 **Context.** XHR progress is only known to the uploading tab. Other tabs must see it without polling.
@@ -196,3 +212,7 @@ Each record: context, decision, alternatives considered, consequences. Records a
 **Alternatives.** Add Playwright for the two-tab race: most convincing, about a day more. Unit only: leaves the guarantee unproven.
 
 **Consequences.** `pnpm test` is fast; `pnpm test:integration` needs `docker compose up mongo`. Manual QA checklist in README covers the browser flows.
+
+**Amended 2026-09-16 — Atlas, and a third test category.** `pnpm test:integration` needs no Docker: it runs against a **dedicated database name on the Atlas cluster** (`signcraft_test`), derived from `.env` by rewriting the path segment of `DATABASE_URL`. The override is mandatory because `resetDb()` wipes every collection. The cost is latency — an M0 write round trip is 2–3 s, so the suite takes about 4.5 minutes and runs serially (`fileParallelism: false`, 30 s timeout) — bought against never having a second, differently-configured database to reason about.
+
+A third category was added below the "no Playwright" line: a small number of **component tests** with `@testing-library/react` under jsdom (`tests/unit/jobs/job-chip.test.tsx`, via a per-file `// @vitest-environment jsdom` pragma). Rationale: the job chip renders claim state that is only correct if the lazy-expiry view and the countdown formatting agree, and that is cheap to assert on rendered output and expensive to assert any other way. It stays a handful of tests rather than a component-testing strategy: the invariants live in `lib/domain`, which is tested directly. Totals: **274 unit** tests in 25 files, **47 integration** tests in 8 files.

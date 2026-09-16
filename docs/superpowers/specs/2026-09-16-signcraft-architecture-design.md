@@ -1,8 +1,10 @@
 # SignCraft — Architecture Design Spec
 
 **Date:** 2026-09-16
-**Status:** Approved (design), not yet implemented
-**Companion docs:** [Decisions (ADRs)](2026-09-16-signcraft-decisions.md) · [UI Pages & Flows](2026-09-16-signcraft-ui-pages-and-flows.md)
+**Status:** Implemented. The design below is as approved; paragraphs marked **Amended 2026-09-16** record where the implementation differs and are authoritative over the text around them.
+**Companion docs:** [Decisions (ADRs)](2026-09-16-signcraft-decisions.md) · [UI Pages & Flows](2026-09-16-signcraft-ui-pages-and-flows.md) · [README](../../../README.md) · [EXPLANATIONS](../../../EXPLANATIONS.md)
+
+> **Amended 2026-09-16 (repo-wide):** Docker was removed from the project. MongoDB Atlas is the database in **every** environment; there is no local Mongo container, no `Dockerfile` and no `docker-compose.yml`. Local development is `.env` + `pnpm dev`; integration tests use a dedicated database name on the same Atlas cluster. `directConnection` is not used anywhere, and Next's `output: 'standalone'` is not used. Every "Docker" or "compose" reference below should be read as "Atlas". Rationale and what is lost: EXPLANATIONS.md §10.
 
 ---
 
@@ -21,6 +23,7 @@ Everything else (persona model, seed data, layout) exists to make those three th
 **Goals**
 - Every rule from the task specification is enforced server-side and mirrored in the UI.
 - A reviewer can run the whole thing with `docker compose up` and also open a live Vercel URL.
+  - **Amended 2026-09-16:** the containerised path was dropped. A reviewer either opens the live Vercel URL (nothing to install) or runs `cp .env.example .env` + `pnpm install && pnpm prisma db push && pnpm db:seed && pnpm dev` against Atlas.
 - The concurrency guarantee is proven by an automated test, not just described.
 - The README explains schema, lock strategy, and upload pipeline with honest trade-offs.
 
@@ -45,6 +48,8 @@ Everything else (persona model, seed data, layout) exists to make those three th
 | Hosting | Vercel (app) + MongoDB Atlas + Cloudflare R2 | |
 | Containers | `Dockerfile` (multi-stage, standalone output) + `docker-compose.yml` | |
 
+**Amended 2026-09-16:** the Database row reads "MongoDB Atlas (every environment)" — M0 is a replica set, which satisfies the Prisma-on-Mongo and change-stream requirement without a local container. The Tests row reads "integration tests hit a dedicated database on the same Atlas cluster". The Containers row is void: there are no container files, and `output: 'standalone'` is not set in `next.config.ts` (which only sets `serverExternalPackages`).
+
 Exact package versions are pinned at implementation time; the constraint that matters is **Prisma 6.x** (ADR-014).
 
 ## 4. Runtime topology
@@ -60,6 +65,8 @@ Exact package versions are pinned at implementation time; the constraint that ma
 ```
 
 Local development replaces Atlas with the Docker Mongo replica set and keeps R2 (a dev bucket). There is no Redis, no worker process, no cron.
+
+**Amended 2026-09-16:** local development uses the *same* Atlas cluster as production (same `DATABASE_URL`), so the topology above is the topology everywhere; only the app process moves (Vercel function vs. `next dev`). Still no Redis, worker, or cron.
 
 ## 5. Domain model
 
@@ -240,6 +247,14 @@ All routes under `app/api/`. JSON in and out. Errors follow §12.
 | `POST /api/assets/:id/abort` | OPS | abort multipart, mark ABORTED | 204 | |
 | `GET /api/events` | any | SSE stream (§10) | 200 `text/event-stream` | |
 
+**Amended 2026-09-16 (as implemented):**
+
+- `POST /api/assets` returns **201** with `{ asset: AssetDTO, uploadId, partSize, partCount }` — the whole asset DTO, not a bare `{assetId}`, so the client can render the row without a second fetch.
+- `POST /api/orders` returns **201**.
+- `POST /api/assets/:id/progress` and `POST /api/assets/:id/abort` return **204**.
+- `POST /api/assets/:id/abort` accepts an **optional** body `{ reason?: 'user' | 'error' }`. `'error'` — what the uploader sends once it has exhausted its part retries — records the asset **FAILED** so the row offers Retry (UI spec §7.6); the default `'user'` records **ABORTED**. An empty body is valid and means `'user'`, so a bare `POST` (curl, `navigator.sendBeacon`) still works.
+- `POST /api/jobs/:id/claim` also returns **404 `NOT_FOUND`** when the job id does not exist (distinguished from 409 `CLAIM_TAKEN` by a follow-up read).
+
 Route Handler conventions: `export const runtime = 'nodejs'` everywhere (Prisma needs Node), `dynamic = 'force-dynamic'` on reads. One handler file per route, thin: parse → persona → call a function in `lib/services/*` → respond. Business logic lives in `lib/services`, never in route files, so integration tests call services directly.
 
 ## 9. Concurrency: claim locking and expiry
@@ -271,6 +286,8 @@ if (res.count !== 1) throw new ApiError(409, 'CLAIM_TAKEN');
 Correctness argument: MongoDB applies an update to a single document atomically and serialises concurrent writers on that document. N concurrent requests each evaluate the filter against the *current* document; the first to apply sets `status` to `CLAIMED` with a future `expiresAt`, so every later evaluation fails the filter and matches zero documents. Exactly one request sees `count === 1`. No transaction, no external lock, no retry loop.
 
 If Prisma's composite-type filter (`claim: { is: {...} }`) proves awkward on the Mongo connector, the fallback is `prisma.$runCommandRaw({ findAndModify: ... })` with the same filter. The README documents whichever is used. Either way the guarantee comes from Mongo's single-document atomicity, not from Prisma.
+
+**Amended 2026-09-16:** the composite-type filter works as written — the `$runCommandRaw` fallback was **not** needed. The implemented `claimJob` (`lib/services/jobs.ts`) matches the sketch above and additionally sets `installerId: null` in the update (so a job re-claimed after a failed verification does not keep a stale assignee), and on `count !== 1` reads the job once to return 404 `NOT_FOUND` rather than 409 `CLAIM_TAKEN` when the id does not exist.
 
 ### 9.2 Verification
 
@@ -325,6 +342,13 @@ Job OPEN → `Promise.allSettled` of 50 `claim()` calls with 50 distinct install
 - A `: heartbeat` comment every 15 s keeps proxies from closing the socket.
 - At 280 s the server sends `event: reconnect` and closes cleanly so the client resumes with `Last-Event-ID` before Vercel ends the function.
 - `request.signal` abort → close the change stream and the Mongo cursor.
+
+**Amended 2026-09-16 (as implemented in `app/api/events/route.ts` + `lib/realtime/sse.ts`):**
+
+- The `$match` covers `insert | update | replace` only. `delete` was dropped: nothing in the app deletes a document, and a delete change carries no `fullDocument` to map into a DTO.
+- The comment lines are `: connected` (once, on open) and `: hb` (every 15 s), not `: heartbeat`.
+- Resume works from `Last-Event-ID` **or** the `?after=<token>` query parameter, because the client reopens the stream explicitly after a `reconnect` frame rather than relying on the browser's automatic retry.
+- Added `event: resync`: when the cursor throws a resumable error (Mongo code 286 `ChangeStreamHistoryLost` or 280 invalid resume token) the server closes the stale cursor, restarts from now, and tells the client to refetch the bootstrap. `MAX_RESYNCS = 3`, after which the stream errors rather than looping.
 
 ### 10.2 Client (`lib/realtime/useRealtime.ts`)
 
@@ -436,6 +460,8 @@ tests/      unit/, integration/
 
 Principles: `lib/domain` has zero imports from Prisma or React. `lib/services` is the only place that talks to the DB. Route handlers stay under about 30 lines. Components never compute permissions themselves; they call `canPersonaDo(...)` from `lib/domain`.
 
+**Amended 2026-09-16 (file names as built):** `lib/realtime/` is `sse.ts` (stream construction), `events.ts` (change → frame), `use-realtime.ts` (client hook) and `apply-event.ts` (cache patching) — kebab-case, not `useRealtime.ts`. `lib/upload/` is `uploader.ts`, `part-source.ts` and `plan.ts`. The permission helpers are `checkTransition` / `orderActionsFor` / `checkUpload` / `jobActionsFor` in `lib/domain/permissions.ts`, not a single `canPersonaDo`. Additional directories that earned their own place: `lib/board/visibility.ts` (which columns a persona sees), `lib/persona/` (cookie + React context), `lib/hooks/use-now.ts` (the shared 1 s clock), `lib/domain/schemas.ts` (Zod), `lib/domain/status-meta.ts`, `format.ts`, `history.ts`, `ring.ts`, `order-actions.ts`, `types.ts`.
+
 ## 14. Testing strategy
 
 | Level | Tool | Covers |
@@ -446,7 +472,11 @@ Principles: `lib/domain` has zero imports from Prisma or React. `lib/services` i
 
 Integration tests reset the DB before each test and run serially. R2 is mocked at the `lib/storage/r2.ts` boundary in tests.
 
+**Amended 2026-09-16 (as built):** integration tests run against a **dedicated database name on the Atlas cluster** (`signcraft_test`), derived from `.env` by rewriting the path segment of `DATABASE_URL`; the exact shell line is in the README and CLAUDE.md. `resetDb()` deletes every collection, which is why the override is mandatory. Serial execution is enforced by `fileParallelism: false` in `vitest.config.ts` with a 30 s per-test timeout, because each assertion is a real round trip to an M0 cluster. A third unit category was added: a handful of component tests (`tests/unit/jobs/job-chip.test.tsx`) using `@testing-library/react` under jsdom via a per-file `// @vitest-environment jsdom` pragma. Totals at the time of writing: **274 unit** tests in 25 files, **47 integration** tests in 8 files.
+
 ## 15. Local development and containers
+
+> **Amended 2026-09-16:** this section is void. There are no container files in the repo. Local development is: `cp .env.example .env` (Atlas SRV string + R2 credentials), `pnpm install`, `pnpm prisma db push`, `pnpm db:seed` **once**, `pnpm dev`. Note that `pnpm install` depends on the `allowBuilds` map in `pnpm-workspace.yaml` — pnpm 11 ignores the older `onlyBuiltDependencies` list, and without it Prisma's build scripts are skipped. The seed paragraph below still holds; the compose description does not.
 
 `docker-compose.yml` services:
 
@@ -457,16 +487,20 @@ Integration tests reset the DB before each test and run serially. R2 is mocked a
 
 Seed (`prisma/seed.ts`, idempotent): 3 vendors, 4 installers, 8 orders spread across every status, including one `READY_FOR_INSTALL` with an OPEN job and one `DRAFT` with an UPLOADED asset.
 
+**Amended 2026-09-16:** the seed is a **one-time manual step**, never part of app start. It is idempotent by `orderNumber` — it skips orders that already exist — which means it does **not** restore orders that have since been moved through the board. Re-running it is not a reset.
+
 ## 16. Deployment and configuration
 
 | Variable | Used by | Notes |
 |---|---|---|
-| `DATABASE_URL` | Prisma and native driver | Atlas SRV string in prod; `mongodb://mongo:27017/signcraft?replicaSet=rs0` locally |
+| `DATABASE_URL` | Prisma and native driver | Atlas SRV string in prod; `mongodb://mongo:27017/signcraft?replicaSet=rs0` locally — **amended 2026-09-16:** the Atlas SRV string is used locally too; there is no local Mongo and no `directConnection` parameter anywhere |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | `lib/storage/r2.ts` | endpoint `https://<account>.r2.cloudflarestorage.com` |
 | `NEXT_PUBLIC_APP_URL` | CORS docs, absolute links | |
 | `CLAIM_TTL_MS` | optional override | default 180000 |
 
 Vercel: Node runtime for all API routes, Fluid compute on, `maxDuration` set on `/api/events`. Atlas: M0 free tier, IP allow-list `0.0.0.0/0` for Vercel egress (documented as demo-only). R2: bucket with the CORS rule and a 1-day lifecycle on `simulated-*` objects.
+
+**Amended 2026-09-16:** build command is `pnpm build` (`prisma generate && next build`); `maxDuration = 300` is set on `/api/events`. R2 CORS `AllowedOrigins` must list both `http://localhost:3000` and the Vercel origin (`https://*.vercel.app` is acceptable), with `AllowedHeaders: ["*"]` and `ExposeHeaders: ["ETag"]` — omitting either breaks uploads in a different way (README, upload section). Windows note for local work: `pnpm build` can fail with `EPERM` on the Prisma query-engine DLL while `pnpm dev` holds it; stop the dev server first.
 
 ## 17. Out of scope (explicitly)
 
