@@ -15,10 +15,20 @@ export interface SseDeps {
 
 const encoder = new TextEncoder();
 
+/** After this many consecutive resumable errors, give up and error the stream instead of looping forever. */
+const MAX_RESYNCS = 3;
+
+/**
+ * A resumable change-stream error: `ChangeStreamHistoryLost` (286) or an
+ * invalid resume token (280). When the driver supplies a numeric error code
+ * that code is authoritative; the message substring check is a fallback for
+ * errors that carry no code at all (never consulted when a code is present,
+ * so an unrelated numeric code can't accidentally match via the message).
+ */
 function isResumeError(err: unknown): boolean {
-  const e = err as { code?: number; message?: unknown } | null | undefined;
+  const e = err as { code?: unknown; message?: unknown } | null | undefined;
   if (!e) return false;
-  if (e.code === 280 || e.code === 286) return true;
+  if (typeof e.code === 'number') return e.code === 280 || e.code === 286;
   return typeof e.message === 'string' && e.message.toLowerCase().includes('resume');
 }
 
@@ -34,6 +44,15 @@ export function createSseStream(
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let maxAgeTimer: ReturnType<typeof setTimeout> | null = null;
   let closed = false;
+
+  /** Idempotent teardown: stop timers and best-effort close the live cursor. Shared by abort, maxAge, fatal error, and stream cancel. */
+  const cleanup = async () => {
+    if (closed) return;
+    closed = true;
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (maxAgeTimer) clearTimeout(maxAgeTimer);
+    if (cursor) await cursor.close().catch(() => {});
+  };
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
@@ -53,14 +72,6 @@ export function createSseStream(
         }
       };
 
-      const cleanup = async () => {
-        if (closed) return;
-        closed = true;
-        if (heartbeatTimer) clearInterval(heartbeatTimer);
-        if (maxAgeTimer) clearTimeout(maxAgeTimer);
-        if (cursor) await cursor.close().catch(() => {});
-      };
-
       signal.addEventListener('abort', () => {
         void cleanup().then(safeClose);
       });
@@ -74,7 +85,7 @@ export function createSseStream(
         void cleanup().then(safeClose);
       }, maxAgeMs);
 
-      const run = async (token: string | null): Promise<void> => {
+      const run = async (token: string | null, resyncCount = 0): Promise<void> => {
         cursor = deps.watch(token);
         try {
           for await (const change of cursor) {
@@ -87,9 +98,12 @@ export function createSseStream(
           }
         } catch (err) {
           if (closed) return;
-          if (isResumeError(err)) {
+          if (isResumeError(err) && resyncCount < MAX_RESYNCS) {
+            const stale = cursor;
+            cursor = null;
+            if (stale) await stale.close().catch(() => {});
             safeEnqueue('event: resync\ndata: {}\n\n');
-            return run(null);
+            return run(null, resyncCount + 1);
           }
           throw err;
         }
@@ -97,19 +111,17 @@ export function createSseStream(
 
       run(resumeToken).catch((err) => {
         if (closed) return;
-        void cleanup();
-        try {
-          controller.error(err);
-        } catch {
-          // already closed
-        }
+        void cleanup().then(() => {
+          try {
+            controller.error(err);
+          } catch {
+            // already closed
+          }
+        });
       });
     },
     cancel() {
-      closed = true;
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (maxAgeTimer) clearTimeout(maxAgeTimer);
-      if (cursor) void cursor.close().catch(() => {});
+      return cleanup();
     },
   });
 }

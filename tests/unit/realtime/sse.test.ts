@@ -55,6 +55,24 @@ function makeHangingCursor(changes: ChangeLike[]) {
   return { cursor, state };
 }
 
+/** A cursor whose first `next()` call rejects with `error`; never actually iterates further. */
+function makeThrowingCursor(error: unknown) {
+  const state = { closeCount: 0 };
+  const cursor: WatchCursor = {
+    close: async () => {
+      state.closeCount++;
+    },
+    [Symbol.asyncIterator]() {
+      return {
+        next: async (): Promise<IteratorResult<ChangeLike>> => {
+          throw error;
+        },
+      };
+    },
+  };
+  return { cursor, state };
+}
+
 describe('createSseStream', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -114,6 +132,74 @@ describe('createSseStream', () => {
     controller.abort();
     await vi.advanceTimersByTimeAsync(0);
 
+    expect(state.closeCount).toBe(1);
+  });
+
+  it('resyncs once on a code-286 error: closes the stale cursor, emits resync, then resumes from a fresh watch(null)', async () => {
+    const err286 = Object.assign(new Error('oplog window exceeded'), { code: 286 });
+    const { cursor: badCursor, state: badState } = makeThrowingCursor(err286);
+    const { cursor: goodCursor } = makeHangingCursor([orderInsert('order3', 'token3')]);
+
+    const watchCalls: (string | null)[] = [];
+    const watch = (token: string | null) => {
+      watchCalls.push(token);
+      return watchCalls.length === 1 ? badCursor : goodCursor;
+    };
+    const deps: SseDeps = { watch, now: () => new Date(), heartbeatMs: 15_000, maxAgeMs: 280_000 };
+    const controller = new AbortController();
+    const stream = createSseStream(deps, 'token0', controller.signal);
+    const reader = stream.getReader();
+
+    await reader.read(); // : connected
+
+    const resync = await reader.read();
+    expect(decoder.decode(resync.value)).toBe('event: resync\ndata: {}\n\n');
+
+    const frame = await reader.read();
+    expect(decoder.decode(frame.value)).toContain('id: token3');
+
+    expect(watchCalls).toEqual(['token0', null]);
+    // The stale cursor from the failed watch(token0) is closed before restarting with watch(null).
+    expect(badState.closeCount).toBe(1);
+  });
+
+  it('gives up after 3 consecutive resync errors and errors the stream (no infinite resync loop)', async () => {
+    const madeCursors: { cursor: WatchCursor; state: { closeCount: number } }[] = [];
+    const watch = () => {
+      const err = Object.assign(new Error('oplog window exceeded'), { code: 286 });
+      const made = makeThrowingCursor(err);
+      madeCursors.push(made);
+      return made.cursor;
+    };
+    const deps: SseDeps = { watch, now: () => new Date(), heartbeatMs: 15_000, maxAgeMs: 280_000 };
+    const controller = new AbortController();
+    const stream = createSseStream(deps, null, controller.signal);
+    const reader = stream.getReader();
+
+    await reader.read(); // : connected
+
+    for (let i = 0; i < 3; i++) {
+      const resync = await reader.read();
+      expect(decoder.decode(resync.value)).toBe('event: resync\ndata: {}\n\n');
+    }
+
+    await expect(reader.read()).rejects.toThrow('oplog window exceeded');
+    // 1 initial watch + 3 resyncs = 4 cursors, all closed (3 explicitly before restart, 1 by fatal cleanup).
+    expect(madeCursors).toHaveLength(4);
+    expect(madeCursors.every((m) => m.state.closeCount === 1)).toBe(true);
+  });
+
+  it('propagates a non-resume watch error and closes the cursor without resyncing', async () => {
+    const boom = new Error('boom');
+    const { cursor, state } = makeThrowingCursor(boom);
+    const deps: SseDeps = { watch: () => cursor, now: () => new Date(), heartbeatMs: 15_000, maxAgeMs: 280_000 };
+    const controller = new AbortController();
+    const stream = createSseStream(deps, null, controller.signal);
+    const reader = stream.getReader();
+
+    await reader.read(); // : connected
+
+    await expect(reader.read()).rejects.toThrow('boom');
     expect(state.closeCount).toBe(1);
   });
 });

@@ -1,3 +1,4 @@
+import { withErrorHandling } from '@/lib/api/errors';
 import { getMongoDb } from '@/lib/db/mongo';
 import { releaseExpired } from '@/lib/services/jobs';
 import { createSseStream, type WatchCursor } from '@/lib/realtime/sse';
@@ -6,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-export async function GET(req: Request): Promise<Response> {
+export const GET = withErrorHandling(async (req: Request): Promise<Response> => {
   await releaseExpired();
 
   const url = new URL(req.url);
@@ -29,4 +30,4 @@ export async function GET(req: Request): Promise<Response> {
       'X-Accel-Buffering': 'no',
     },
   });
-}
+});
