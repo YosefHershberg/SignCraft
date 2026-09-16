@@ -17,24 +17,18 @@ A full-stack micro-application for managing custom-signage orders, vendor produc
 ## Quick start
 
 ```bash
-cp .env.example .env         # fill in R2 credentials (see Configuration)
-docker compose up            # Mongo replica set + app, seeded, on http://localhost:3000
-```
-
-For local development outside the container:
-
-```bash
-docker compose up mongo      # replica set only
+cp .env.example .env         # Atlas DATABASE_URL + R2 credentials (see Configuration)
 pnpm install
-pnpm prisma db push && pnpm prisma db seed
-pnpm dev
+pnpm prisma db push          # sync indexes
+pnpm db:seed                 # once: 3 vendors, 4 installers, 8 orders
+pnpm dev                     # http://localhost:3000
 ```
 
 Tests:
 
 ```bash
 pnpm test                    # unit tests, no infrastructure
-pnpm test:integration        # needs the compose Mongo; includes the 50-way claim race
+pnpm test:integration        # hits Atlas (use a dedicated DB name); includes the 50-way claim race
 ```
 
 ## Stack

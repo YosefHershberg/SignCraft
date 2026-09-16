@@ -4,7 +4,7 @@ Guidance for Claude Code (and humans) working in this repo. Keep it short; the s
 
 ## What this is
 
-A technical-assessment micro-app: B2B signage marketplace dashboard. A human reviewer will read the README, run `docker compose up`, open the live Vercel URL, and judge three things: the order state machine, double-booking prevention on installer claims, and the direct-to-cloud upload pipeline. Task statement: `SignCraft_Task_Specification.md`.
+A technical-assessment micro-app: B2B signage marketplace dashboard. A human reviewer will read the README, run it locally with `pnpm dev` against Atlas, open the live Vercel URL, and judge three things: the order state machine, double-booking prevention on installer claims, and the direct-to-cloud upload pipeline. Task statement: `SignCraft_Task_Specification.md`.
 
 ## Source of truth
 
@@ -43,7 +43,6 @@ pnpm test                # unit, no infra
 pnpm test:integration    # hits Atlas (use a dedicated DB name via DATABASE_URL); runs claim race etc.
 pnpm prisma db push      # schema sync (Mongo has no migrations)
 pnpm prisma db seed      # idempotent seed: 3 vendors, 4 installers, 8 orders
-docker compose up        # app container against Atlas, seeded on start, on :3000
 ```
 
 ## Working conventions
