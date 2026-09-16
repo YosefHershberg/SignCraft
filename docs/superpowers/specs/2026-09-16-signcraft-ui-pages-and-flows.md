@@ -1,3 +1,4 @@
+
 # SignCraft — UI Pages & Flows (Stitch handoff)
 
 **Date:** 2026-09-16

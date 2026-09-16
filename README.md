@@ -139,12 +139,16 @@ Vercel functions cap request bodies at 4.5 MB, so file bytes never touch the app
 R2 bucket CORS rule required:
 
 ```json
-[{ "AllowedOrigins": ["http://localhost:3000", "https://<your-vercel-domain>"],
-   "AllowedMethods": ["PUT"],
+[{ "AllowedOrigins": ["http://localhost:3000", "https://*.vercel.app"],
+   "AllowedMethods": ["GET", "PUT", "HEAD"],
    "AllowedHeaders": ["*"],
    "ExposeHeaders": ["ETag"],
    "MaxAgeSeconds": 3600 }]
 ```
+
+Set this in the dashboard under the bucket's Settings tab. An R2 token scoped to Object Read & Write can upload objects but cannot change bucket configuration, so `PutBucketCors` over the S3 API returns 403 with those credentials.
+
+Two fields are easy to omit and each breaks uploads in a different way. Without `AllowedHeaders` the preflight returns 403 as soon as the browser announces `Content-Type`, which it does on every part. Without `ExposeHeaders` the part upload succeeds but JavaScript cannot read the `ETag` off the response, so the client has no part tags to send to `CompleteMultipartUpload` and the upload can never finish. Note that `Access-Control-Expose-Headers` is returned on the actual response, not on the preflight, so verify it with a real cross-origin PUT rather than an `OPTIONS` probe.
 
 ### Realtime
 
