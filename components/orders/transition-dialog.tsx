@@ -68,10 +68,6 @@ export function TransitionDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order.id]);
 
-  // A newer version of this order reached the tab: the board is no longer the
-  // one that lost the race, so let the user try again.
-  useEffect(() => setConflict(false), [order.version]);
-
   const restoreFocus = useRestoreFocus(
     open,
     // The opener is the sheet's action button or the card's ⋯ item; the latter
