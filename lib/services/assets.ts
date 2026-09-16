@@ -40,7 +40,15 @@ export async function createAsset(
   });
 
   const key = storageKeyFor(input.orderId, created.id, input.fileName);
-  const { uploadId } = await storage.createMultipart(key, input.contentType);
+
+  let uploadId: string;
+  try {
+    ({ uploadId } = await storage.createMultipart(key, input.contentType));
+  } catch (err) {
+    // Keep the row (rather than deleting it) so the UI can show "Failed / Retry".
+    await prisma.asset.update({ where: { id: created.id }, data: { storageKey: key, status: 'FAILED' } });
+    throw err;
+  }
 
   const updated = await prisma.asset.update({
     where: { id: created.id },
@@ -98,6 +106,9 @@ export async function completeAsset(
 ): Promise<AssetDTO> {
   const asset = await prisma.asset.findUnique({ where: { id: assetId } });
   if (!asset) throw new ApiError(404, 'NOT_FOUND');
+  if (asset.status !== 'UPLOADING' || !asset.uploadId) {
+    throw new ApiError(409, 'VERSION_CONFLICT', { status: asset.status });
+  }
 
   const sortedParts = [...parts].sort((a, b) => a.partNumber - b.partNumber);
 

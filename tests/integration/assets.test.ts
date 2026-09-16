@@ -90,6 +90,20 @@ describe('assets service', () => {
     expect(storage.createMultipart).not.toHaveBeenCalled();
   });
 
+  it('marks the asset FAILED and rethrows when createMultipart fails, keeping the row for retry', async () => {
+    const { order } = await makeDraftOrder({ status: 'DRAFT' });
+    vi.mocked(storage.createMultipart).mockRejectedValueOnce(new ApiError(502, 'STORAGE_ERROR'));
+
+    await expect(createAsset(assetInput(order.id), OPS)).rejects.toMatchObject({
+      status: 502,
+      code: 'STORAGE_ERROR',
+    });
+
+    const db = await prisma.asset.findFirstOrThrow({ where: { orderId: order.id } });
+    expect(db.status).toBe('FAILED');
+    expect(db.uploadId).toBeNull();
+  });
+
   it('presigns a URL per requested part number', async () => {
     const { result } = await createUploadingAsset();
 
@@ -136,6 +150,17 @@ describe('assets service', () => {
     await reportProgress(result.asset.id, size);
     const db2 = await prisma.asset.findUniqueOrThrow({ where: { id: result.asset.id } });
     expect(db2.progressPct).toBe(50); // untouched: reportProgress no-ops once not UPLOADING
+  });
+
+  it('completeAsset 409s on an asset that is not UPLOADING, without touching storage', async () => {
+    const { result } = await createUploadingAsset();
+    await prisma.asset.update({ where: { id: result.asset.id }, data: { status: 'UPLOADED' } });
+
+    await expect(
+      completeAsset(result.asset.id, [{ partNumber: 1, etag: 'e1' }])
+    ).rejects.toMatchObject({ status: 409, code: 'VERSION_CONFLICT', details: { status: 'UPLOADED' } });
+
+    expect(storage.completeMultipart).not.toHaveBeenCalled();
   });
 
   it('completeAsset marks UPLOADED and calls completeMultipart with parts sorted by partNumber', async () => {
