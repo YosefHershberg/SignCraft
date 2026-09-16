@@ -26,3 +26,15 @@ export function visibleOrderActions(persona: Persona, order: OrderDTO, now: Date
     (availability) => !(persona.kind === 'installer' && availability.action === 'complete')
   );
 }
+
+/**
+ * The other half of that split: whether the install job panel offers Complete.
+ *
+ * It asks the order, not the job. `jobActionsFor` only ever sees the job, which
+ * stays ASSIGNED after the order closes — so on its own it kept offering a
+ * Complete button on an already-COMPLETED order that the server would refuse
+ * with a 400 (UI spec §7.1 step 8 leaves the sheet open on that very order).
+ */
+export function canCompleteOrder(persona: Persona, order: OrderDTO, now: Date): boolean {
+  return orderActionsFor(persona, orderCtx(order), now).some((a) => a.action === 'complete' && a.enabled);
+}

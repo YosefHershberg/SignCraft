@@ -27,6 +27,26 @@ export function actorIdOf(p: Persona): string | null {
   return p.kind === 'ops' ? null : p.id;
 }
 
+/**
+ * The persona a cookie may safely restore into: `ops` unless the remembered
+ * vendor or installer still exists.
+ *
+ * The cookie outlives the database it was written against — reseeding, or the
+ * same browser visiting a local build and then the deployed one, leaves an id
+ * that resolves to nothing. Without this the header read "Unknown vendor" over
+ * a board filtered to a vendor with no orders, which looks like data loss
+ * rather than a stale cookie.
+ */
+export function resolvePersona(
+  p: Persona | null,
+  vendors: VendorDTO[],
+  installers: InstallerDTO[]
+): Persona {
+  if (!p || p.kind === 'ops') return { kind: 'ops' };
+  const known = p.kind === 'vendor' ? vendors.some((v) => v.id === p.id) : installers.some((i) => i.id === p.id);
+  return known ? p : { kind: 'ops' };
+}
+
 export function personaLabel(
   p: Persona,
   vendors: VendorDTO[],

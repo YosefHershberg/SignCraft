@@ -109,7 +109,9 @@ export function VerificationDialog({
             {view === 'success'
               ? 'This install is yours — Complete it when the sign is up.'
               : view === 'expired'
-                ? 'Claim expired — job returned to marketplace.'
+                ? // The §4.9 sentence is "Claim expired — job returned to marketplace";
+                  // its first half is already the title, so only the second half runs here.
+                  'Job returned to marketplace.'
                 : 'Verify identity and payment to lock in this job.'}
           </DialogDescription>
         </DialogHeader>

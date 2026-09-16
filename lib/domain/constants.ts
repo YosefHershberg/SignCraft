@@ -9,6 +9,8 @@ export const PRESIGN_EXPIRY_S = 3_600;
 export const SSE_MAX_AGE_MS = 280_000;
 export const SSE_HEARTBEAT_MS = 15_000;
 export const DEGRADED_AFTER_FAILURES = 3;
+/** Our own SSE retry delay, for the failures EventSource refuses to retry itself. */
+export const SSE_RETRY_MS = 3_000;
 export const DEGRADED_POLL_MS = 10_000;
 export const UPLOADABLE_STATUSES = ['DRAFT', 'SUBMITTED'] as const;
 export const SIMULATED_SIZES = [

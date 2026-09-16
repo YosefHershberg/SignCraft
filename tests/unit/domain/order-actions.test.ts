@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { orderCtx, visibleOrderActions } from '@/lib/domain/order-actions';
+import { canCompleteOrder, orderCtx, visibleOrderActions } from '@/lib/domain/order-actions';
 import { orderActionsFor } from '@/lib/domain/permissions';
 import type { AssetDTO, AssetStatus, JobDTO, OrderDTO, OrderStatus, Persona } from '@/lib/domain/types';
 
@@ -129,5 +129,43 @@ describe('visibleOrderActions', () => {
       { action: 'accept', enabled: true, reason: null },
       { action: 'cancel', enabled: true, reason: null },
     ]);
+  });
+});
+
+describe('canCompleteOrder', () => {
+  it('is true for the assigned installer while the order is still ready for install', () => {
+    const dto = order('READY_FOR_INSTALL', { installJob: assignedJob(INSTALLER_ID) });
+    expect(canCompleteOrder(installer, dto, now)).toBe(true);
+  });
+
+  it('is false once the order is COMPLETED, even though the job is still ASSIGNED to them', () => {
+    const dto = order('COMPLETED', { installJob: assignedJob(INSTALLER_ID) });
+    expect(dto.installJob?.status).toBe('ASSIGNED');
+    expect(canCompleteOrder(installer, dto, now)).toBe(false);
+  });
+
+  it('is false for an installer who does not hold the job, and for other personas', () => {
+    const dto = order('READY_FOR_INSTALL', { installJob: assignedJob(OTHER_INSTALLER_ID) });
+    expect(canCompleteOrder(installer, dto, now)).toBe(false);
+    expect(canCompleteOrder(ops, order('READY_FOR_INSTALL', { installJob: assignedJob(INSTALLER_ID) }), now)).toBe(
+      false
+    );
+    expect(
+      canCompleteOrder(vendorOwner, order('READY_FOR_INSTALL', { installJob: assignedJob(INSTALLER_ID) }), now)
+    ).toBe(false);
+  });
+
+  it('is false while the job is only claimed, not assigned', () => {
+    const claimed: JobDTO = {
+      ...assignedJob(INSTALLER_ID),
+      status: 'CLAIMED',
+      installerId: null,
+      claim: {
+        installerId: INSTALLER_ID,
+        claimedAt: '2026-09-16T11:59:00.000Z',
+        expiresAt: '2026-09-16T12:02:00.000Z',
+      },
+    };
+    expect(canCompleteOrder(installer, order('READY_FOR_INSTALL', { installJob: claimed }), now)).toBe(false);
   });
 });

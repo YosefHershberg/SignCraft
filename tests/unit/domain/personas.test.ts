@@ -5,6 +5,7 @@ import {
   actorTypeOf,
   actorIdOf,
   personaLabel,
+  resolvePersona,
 } from '@/lib/domain/personas';
 
 const VENDOR_ID = 'a'.repeat(24);
@@ -106,5 +107,38 @@ describe('personaLabel', () => {
       name: 'Unknown installer',
       role: 'Installer',
     });
+  });
+});
+
+describe('resolvePersona', () => {
+  const vendors = [{ id: VENDOR_ID, name: 'Acme Signs' }];
+  const installers = [{ id: INSTALLER_ID, name: 'Jane Installer' }];
+  const STALE_ID = 'c'.repeat(24);
+
+  it('keeps a vendor or installer who still exists', () => {
+    expect(resolvePersona({ kind: 'vendor', id: VENDOR_ID }, vendors, installers)).toEqual({
+      kind: 'vendor',
+      id: VENDOR_ID,
+    });
+    expect(resolvePersona({ kind: 'installer', id: INSTALLER_ID }, vendors, installers)).toEqual({
+      kind: 'installer',
+      id: INSTALLER_ID,
+    });
+  });
+
+  it('falls back to ops for an id this database does not have', () => {
+    expect(resolvePersona({ kind: 'vendor', id: STALE_ID }, vendors, installers)).toEqual({ kind: 'ops' });
+    expect(resolvePersona({ kind: 'installer', id: STALE_ID }, vendors, installers)).toEqual({ kind: 'ops' });
+  });
+
+  it('does not confuse the two lists', () => {
+    // A vendor id that happens to match an installer is still an unknown vendor.
+    expect(resolvePersona({ kind: 'vendor', id: INSTALLER_ID }, vendors, installers)).toEqual({ kind: 'ops' });
+  });
+
+  it('passes ops through and turns an unparseable cookie into ops', () => {
+    expect(resolvePersona({ kind: 'ops' }, vendors, installers)).toEqual({ kind: 'ops' });
+    expect(resolvePersona(null, vendors, installers)).toEqual({ kind: 'ops' });
+    expect(resolvePersona(parsePersona('nonsense'), vendors, installers)).toEqual({ kind: 'ops' });
   });
 });

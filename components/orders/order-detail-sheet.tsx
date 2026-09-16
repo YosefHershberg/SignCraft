@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { JobPanel } from '@/components/jobs/job-panel';
 import { UploadPanel } from '@/components/uploads/upload-panel';
@@ -47,8 +47,16 @@ export function OrderDetailSheet({
   onClaim,
   onVerify,
 }: OrderDetailSheetProps) {
-  const order = useOrder(orderId);
-  const missing = open && orderId !== null && order === null;
+  const live = useOrder(orderId);
+  const missing = open && orderId !== null && live === null;
+
+  // `orderId` clears on the same tick as `open`, so rendering only `live` would
+  // unmount the sheet before Radix could play its slide-out. The last order
+  // shown is kept for exactly that closing frame; it is never used while open,
+  // so nothing stale can be displayed.
+  const lastShown = useRef<OrderDTO | null>(null);
+  if (live) lastShown.current = live;
+  const order = live ?? (open ? null : lastShown.current);
 
   // The order left the cache (deleted, or filtered out of a refetch): there is
   // nothing left to show, so close rather than render an empty shell.
@@ -79,11 +87,25 @@ export function OrderDetailSheet({
       <SheetContent
         side="right"
         onCloseAutoFocus={restoreFocus}
+        // Focus leaving the sheet is never a dismissal. Radix treats it as one,
+        // which closed the sheet whenever a dialog it had raised handed focus
+        // back to the board card on confirm (§7.1 steps 3-8). A deliberate
+        // click outside still dismisses, through `onInteractOutside` below.
+        onFocusOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => {
-          // The header and any portalled menu are "outside" the sheet but are
-          // not a dismissal — that is exactly the persona switch in §7.8.
+          // The header, any portalled menu, and the confirm dialogs this sheet
+          // itself raises are all "outside" it but none of them is a dismissal:
+          // the header case is the persona switch in §7.8, and a dialog opened
+          // from the action bar must leave the sheet standing behind it, so
+          // confirming a transition returns the user to the order they were on.
           const target = event.target as Element | null;
-          if (target?.closest('header,[data-radix-popper-content-wrapper],[role="menu"]')) event.preventDefault();
+          if (
+            target?.closest(
+              'header,[data-radix-popper-content-wrapper],[role="menu"],[role="dialog"],[role="alertdialog"]'
+            )
+          ) {
+            event.preventDefault();
+          }
         }}
         className="flex w-full flex-col gap-0 rounded-l-[12px] p-0 top-0 bottom-0 h-auto sm:top-14 sm:w-[90vw] sm:max-w-[90vw] xl:w-[480px] xl:max-w-[480px]"
       >

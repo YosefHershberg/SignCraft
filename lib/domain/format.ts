@@ -18,6 +18,21 @@ export function formatCountdown(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+/**
+ * A duration as sentence copy ("3 minutes", "20 seconds", "1 minute 30
+ * seconds"). Used for the claim TTL, which the dialog must not hardcode: the
+ * server's `CLAIM_TTL_MS` override has to read correctly in the copy too.
+ */
+export function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const parts: string[] = [];
+  if (minutes > 0) parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
+  if (seconds > 0 || minutes === 0) parts.push(`${seconds} second${seconds === 1 ? '' : 's'}`);
+  return parts.join(' ');
+}
+
 export function formatDue(iso: string): string {
   const parts = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).formatToParts(new Date(iso));
   const day = parts.find((p) => p.type === 'day')?.value ?? '';

@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { keys } from '@/lib/query/keys';
 import { usePersona } from '@/lib/persona/persona-context';
-import { DEGRADED_AFTER_FAILURES } from '@/lib/domain/constants';
+import { DEGRADED_AFTER_FAILURES, SSE_RETRY_MS } from '@/lib/domain/constants';
 import type { BootstrapDTO, SseEvent } from '@/lib/domain/types';
 import { applyEvent, shouldToastNewJob } from './apply-event';
 
@@ -27,6 +27,25 @@ export function reduceConnection(state: ConnectionState, action: 'open' | 'error
   if (action === 'reconnect') return { status: 'reconnecting', failures: state.failures };
   const failures = state.failures + 1;
   return { status: failures >= DEGRADED_AFTER_FAILURES ? 'degraded' : 'reconnecting', failures };
+}
+
+/** `EventSource.CLOSED`, spelled out so this stays testable without a DOM. */
+const EVENT_SOURCE_CLOSED = 2;
+
+/**
+ * Whether *we* have to schedule the next attempt after an `error` event.
+ *
+ * EventSource only retries by itself after a transport-level failure, and it
+ * leaves `readyState` at CONNECTING while it does. An HTTP error status or a
+ * non-`text/event-stream` body is fatal by spec: it closes the stream for good
+ * and fires no further errors. That is precisely what `/api/events` produces
+ * when the change stream dies (it 500s), and without our own retry the app
+ * would sit on "Reconnecting…" forever — the failure count would never reach
+ * DEGRADED_AFTER_FAILURES, so the degraded 10 s poll would never take over and
+ * the board would go quiet with a hopeful amber dot (UI spec §7.7).
+ */
+export function shouldRetryManually(readyState: number): boolean {
+  return readyState === EVENT_SOURCE_CLOSED;
 }
 
 // Module-level store so other hooks (useBootstrap) can read the live
@@ -74,6 +93,7 @@ export function useRealtime(): ConnectionStatus {
   useEffect(() => {
     let es: EventSource | null = null;
     let closed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
     function setState(next: ConnectionState) {
       const wasDegraded = stateRef.current.status === 'degraded';
@@ -112,7 +132,15 @@ export function useRealtime(): ConnectionStatus {
       es = new EventSource(url);
 
       es.onopen = () => setState(reduceConnection(stateRef.current, 'open'));
-      es.onerror = () => setState(reduceConnection(stateRef.current, 'error'));
+      es.onerror = () => {
+        setState(reduceConnection(stateRef.current, 'error'));
+        // See `shouldRetryManually`: a fatal error means no further attempts
+        // and no further error events, so the retry loop has to be ours.
+        if (!closed && shouldRetryManually(es?.readyState ?? EVENT_SOURCE_CLOSED)) {
+          es?.close();
+          retryTimer = setTimeout(connect, SSE_RETRY_MS);
+        }
+      };
 
       for (const name of EVENT_NAMES) {
         es.addEventListener(name, handleEvent(name));
@@ -135,6 +163,7 @@ export function useRealtime(): ConnectionStatus {
 
     return () => {
       closed = true;
+      clearTimeout(retryTimer);
       es?.close();
     };
   }, [qc, persona]);

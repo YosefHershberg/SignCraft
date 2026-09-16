@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatCountdown, formatDue, formatTime, sanitiseFileName } from '@/lib/domain/format';
+import { formatBytes, formatCountdown, formatDue, formatDuration, formatTime, sanitiseFileName } from '@/lib/domain/format';
 
 describe('formatBytes', () => {
   it('formats gigabytes with one decimal', () => {
@@ -22,6 +22,28 @@ describe('formatCountdown', () => {
 
   it('formats zero', () => {
     expect(formatCountdown(0)).toBe('0:00');
+  });
+});
+
+describe('formatDuration', () => {
+  it('formats the default claim TTL as whole minutes', () => {
+    expect(formatDuration(180_000)).toBe('3 minutes');
+  });
+
+  it('singularises one minute', () => {
+    expect(formatDuration(60_000)).toBe('1 minute');
+  });
+
+  it('formats a sub-minute TTL in seconds (the CLAIM_TTL_MS demo override)', () => {
+    expect(formatDuration(20_000)).toBe('20 seconds');
+  });
+
+  it('formats a mixed duration as minutes and seconds', () => {
+    expect(formatDuration(90_000)).toBe('1 minute 30 seconds');
+  });
+
+  it('never goes negative', () => {
+    expect(formatDuration(-5_000)).toBe('0 seconds');
   });
 });
 

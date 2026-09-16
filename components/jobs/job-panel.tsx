@@ -1,10 +1,13 @@
 'use client';
 
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { claimRemainingMs, toPublicJob } from '@/lib/domain/claims';
+import { canCompleteOrder } from '@/lib/domain/order-actions';
 import { jobActionsFor } from '@/lib/domain/permissions';
 import { claimTotalMs, ringColour } from '@/lib/domain/ring';
 import type { InstallerDTO, JobDTO, OrderDTO, Persona } from '@/lib/domain/types';
+import { useVerify } from '@/lib/query/hooks';
 import { cn } from '@/lib/utils';
 import { ClaimButton, claimButtonVisible } from './claim-button';
 import { ClaimCountdown } from './claim-countdown';
@@ -39,12 +42,18 @@ export function JobPanel({
   onVerify: (job: JobDTO) => void;
   onComplete: (order: OrderDTO) => void;
 }) {
+  // Declared before the early return below: hooks may not sit behind a branch.
+  const verify = useVerify();
+
   const job = order.installJob;
   if (!job || (order.status !== 'READY_FOR_INSTALL' && order.status !== 'COMPLETED')) return null;
 
   const at = new Date(now);
   const pub = toPublicJob(job, at);
-  const { canVerify, canComplete } = jobActionsFor(persona, job, at);
+  const { canVerify } = jobActionsFor(persona, job, at);
+  // Asked of the order, not the job: the job stays ASSIGNED once the order is
+  // COMPLETED, so the job alone would keep offering a dead Complete button.
+  const canComplete = canCompleteOrder(persona, order, at);
   const nameOf = (id: string | null | undefined) =>
     (id ? installers.find((i) => i.id === id)?.name : undefined) ?? 'Unknown installer';
   const mine = (id: string | null | undefined) => (persona.kind === 'installer' && id === persona.id ? ' (you)' : '');
@@ -133,6 +142,26 @@ export function JobPanel({
               className={cn(ACTION, 'bg-[#0D9488] text-white hover:bg-[#0F766E]')}
             >
               Verify claim
+            </Button>
+          )}
+          {/* §7.4 without opening the dialog first: same mutation, same toast. */}
+          {canVerify && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={verify.isPending}
+              onClick={() =>
+                verify.mutate(
+                  { jobId: job.id, outcome: 'fail' },
+                  { onSuccess: () => toast.error('Verification failed — job released') }
+                )
+              }
+              className={cn(
+                ACTION,
+                'border border-slate-200 bg-white text-[#DC2626] hover:bg-[#FEF2F2] hover:text-[#B91C1C]'
+              )}
+            >
+              Simulate failure
             </Button>
           )}
           {canComplete && (

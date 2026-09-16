@@ -97,6 +97,11 @@ export interface BootstrapDTO {
   installers: InstallerDTO[];
   orders: OrderDTO[];
   serverTime: string;
+  /**
+   * The server's claim TTL, so client copy ("you'll have N minutes…") matches
+   * a `CLAIM_TTL_MS` override instead of hardcoding the 3-minute default.
+   */
+  claimTtlMs: number;
 }
 
 export type OrderAction = 'submit' | 'accept' | 'start_production' | 'mark_ready' | 'complete' | 'cancel';

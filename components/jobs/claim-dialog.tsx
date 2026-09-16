@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { InlineError } from '@/components/orders/inline-error';
 import { useRestoreFocus, visibleElement } from '@/components/orders/use-restore-focus';
 import { toPublicJob } from '@/lib/domain/claims';
+import { formatDuration } from '@/lib/domain/format';
 import { jobActionsFor } from '@/lib/domain/permissions';
 import type { InstallerDTO, JobDTO, Persona } from '@/lib/domain/types';
 import { ApiClientError } from '@/lib/query/api-client';
@@ -29,6 +30,7 @@ export function ClaimDialog({
   persona,
   installers,
   now,
+  claimTtlMs,
   onClaimed,
 }: {
   open: boolean;
@@ -38,6 +40,8 @@ export function ClaimDialog({
   installers: InstallerDTO[];
   /** Epoch ms from the board clock. */
   now: number;
+  /** The server's TTL (`BootstrapDTO.claimTtlMs`), so the copy follows an override. */
+  claimTtlMs: number;
   onClaimed: (job: JobDTO) => void;
 }) {
   const claim = useClaim();
@@ -80,8 +84,8 @@ export function ClaimDialog({
             Claim this job?
           </DialogTitle>
           <DialogDescription className="text-[14px] leading-5 text-pretty text-slate-600">
-            You&rsquo;ll have 3 minutes to verify your identity and payment details, otherwise it returns to the
-            marketplace.
+            You&rsquo;ll have {formatDuration(claimTtlMs)} to verify your identity and payment details, otherwise it
+            returns to the marketplace.
           </DialogDescription>
         </DialogHeader>
 

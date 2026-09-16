@@ -26,6 +26,7 @@ import {
   FIELD_INPUT_CLASS as INPUT,
   Field,
   SelectField,
+  TextField,
   buildInput,
   fieldError,
   fieldErrorId,
@@ -101,15 +102,13 @@ export function CreateOrderDialog({
   }
 
   const text = (name: FieldName, placeholder?: string) => (
-    <Input
-      id={`order-${name}`}
-      placeholder={placeholder}
+    <TextField
+      name={name}
       value={values[name]}
-      aria-invalid={!!errors[name]}
-      aria-describedby={errors[name] ? fieldErrorId(name) : undefined}
-      onChange={(e) => set(name, e.target.value)}
+      error={errors[name]}
+      placeholder={placeholder}
+      onChange={(value) => set(name, value)}
       onBlur={blur(name)}
-      className={INPUT}
     />
   );
 

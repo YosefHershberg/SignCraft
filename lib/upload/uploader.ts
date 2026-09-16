@@ -67,13 +67,24 @@ export class MultipartUploader {
     return this._state;
   }
 
-  abort(): void {
-    if (this._state !== 'running') return;
+  /**
+   * Tears the in-flight parts down and tells the server. The parts stop
+   * synchronously; the returned promise is the *server* call, so a caller that
+   * awaits it learns whether the abort was actually recorded. Ignoring it is
+   * safe — the rejection is handled either way — but then the tab has only
+   * promised itself the upload is over.
+   */
+  abort(): Promise<void> {
+    if (this._state !== 'running') return Promise.resolve();
     this.aborting = true;
     for (const controller of this.controllers.values()) controller.abort();
     this._state = 'aborted';
-    void this.opts.api.abort(this.opts.assetId).catch(() => {});
+    const told = this.opts.api.abort(this.opts.assetId);
+    // Attached here so an un-awaited abort() can never surface as an unhandled
+    // rejection; `told` itself still carries the failure to whoever awaits it.
+    told.catch(() => {});
     this.opts.onAborted?.();
+    return told;
   }
 
   async start(): Promise<void> {

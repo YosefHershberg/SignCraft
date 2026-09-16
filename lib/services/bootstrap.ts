@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma';
+import { claimTtlMs } from '@/lib/domain/claims';
 import type { BootstrapDTO } from '@/lib/domain/types';
 import { normalise, toOrderDTO } from './dto';
 import { ORDER_INCLUDE } from './orders';
@@ -25,5 +26,6 @@ export async function getBootstrap(now: Date = new Date()): Promise<BootstrapDTO
     installers: normalise(installers),
     orders: orders.map((order) => toOrderDTO(order, now)),
     serverTime: now.toISOString(),
+    claimTtlMs: claimTtlMs({ CLAIM_TTL_MS: process.env.CLAIM_TTL_MS }),
   };
 }

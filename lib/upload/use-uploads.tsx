@@ -190,9 +190,10 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
         // Flag only what `abort()` will actually act on, so a click that lands
         // after the upload settled cannot leave the flag behind.
         if (uploader.state === 'running') userAborts.current.add(assetId);
-        // Fire-and-forget by design: the uploader tears the parts down and
-        // calls `api.abort` itself, which reads the flag just set.
-        uploader.abort();
+        // The uploader tears the parts down and calls `api.abort` itself
+        // (reading the flag just set); awaiting its result is what makes this
+        // method's contract — "resolves once the server has been told" — true.
+        await uploader.abort();
         return;
       }
       // No uploader here means another tab (or a previous page load) owns the
@@ -205,14 +206,20 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   const retry = useCallback(
     async (asset: AssetDTO): Promise<boolean> => {
       const source = sources.current.get(asset.id);
+      // The retry runs as a *new* asset, so the failed one's entry is dead
+      // weight from here on — it is only ever keyed by the id being replaced.
+      const pruneSource = () => sources.current.delete(asset.id);
+
       if (source?.file) {
         await start({ orderId: source.orderId, file: source.file });
+        pruneSource();
         return true;
       }
       // A simulated asset carries everything needed to recreate it, so it
       // survives a reload; a real File does not.
       if (asset.simulated) {
         await start({ orderId: asset.orderId, simulatedBytes: asset.sizeBytes });
+        pruneSource();
         return true;
       }
       return false;

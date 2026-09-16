@@ -3,11 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { KanbanBoard } from '@/components/board/kanban-board';
-import { ClaimDialog } from '@/components/jobs/claim-dialog';
-import { VerificationDialog } from '@/components/jobs/verification-dialog';
-import { CreateOrderDialog } from '@/components/orders/create-order-dialog';
-import { OrderDetailSheet } from '@/components/orders/order-detail-sheet';
-import { TransitionDialog } from '@/components/orders/transition-dialog';
+import { DashboardDialogs } from '@/components/dashboard-dialogs';
 import { Providers } from '@/components/providers';
 import { AppHeader } from '@/components/layout/app-header';
 import { useBootstrap } from '@/lib/query/hooks';
@@ -22,6 +18,9 @@ const HIGHLIGHT_MS = 600;
 
 /** Stable identity so the decay effect below does not re-arm on every render. */
 const NO_HIGHLIGHT: ReadonlySet<string> = new Set();
+
+/** How long a lapsed claim stays in the "already refetched" set (see `onClaimExpired`). */
+const DEDUPE_WINDOW_MS = 10 * 60_000;
 
 /**
  * App shell entry point. `Providers` needs `initialPersona` (only available
@@ -55,7 +54,6 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
   const expiredClaims = useRef(new Set<string>());
 
   const vendorNames = Object.fromEntries(board.vendors.map((v) => [v.id, v.name]));
-  const pendingOrder = pendingAction ? board.orders.find((o) => o.id === pendingAction.orderId) : undefined;
 
   const onAction = useCallback(
     (order: OrderDTO, action: OrderAction) => setPendingAction({ orderId: order.id, action }),
@@ -65,9 +63,6 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
   const onClaim = useCallback((job: JobDTO) => setClaimOrderId(job.orderId), []);
   const onVerify = useCallback((job: JobDTO) => setVerifyOrderId(job.orderId), []);
 
-  const claimJob = board.orders.find((o) => o.id === claimOrderId)?.installJob ?? null;
-  const verifyJob = board.orders.find((o) => o.id === verifyOrderId)?.installJob ?? null;
-
   /**
    * A claim lapsed: refetch so the server's lazy expiry reconciles. The mobile
    * and desktop trees are both mounted, so the same claim reports twice —
@@ -76,6 +71,13 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
   const onClaimExpired = useCallback(
     (key: string) => {
       if (expiredClaims.current.has(key)) return;
+      // Long-lived tab: drop keys whose expiry is well past, so the set stays
+      // the size of the claims still on screen rather than the session's total.
+      for (const seen of expiredClaims.current) {
+        if (Date.parse(seen.slice(seen.indexOf(':') + 1)) < Date.now() - DEDUPE_WINDOW_MS) {
+          expiredClaims.current.delete(seen);
+        }
+      }
       expiredClaims.current.add(key);
       void queryClient.invalidateQueries({ queryKey: keys.bootstrap });
     },
@@ -113,62 +115,26 @@ function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
         </button>
       )}
 
-      <OrderDetailSheet
-        orderId={selectedOrderId}
-        open={selectedOrderId !== null}
-        onOpenChange={(open) => !open && setSelectedOrderId(null)}
-        onAction={onAction}
-        vendors={board.vendors}
-        installers={board.installers}
+      <DashboardDialogs
+        board={board}
         persona={persona}
         now={now}
+        onAction={onAction}
         onClaim={onClaim}
         onVerify={onVerify}
-      />
-
-      {claimJob && (
-        <ClaimDialog
-          open
-          onOpenChange={(open) => !open && setClaimOrderId(null)}
-          job={claimJob}
-          persona={persona}
-          installers={board.installers}
-          now={now}
-          // The claim dialog closes itself first; this only hands the won claim
-          // straight to the verification countdown (UI spec §7.1 step 7).
-          onClaimed={(job) => {
-            setClaimOrderId(null);
-            setVerifyOrderId(job.orderId);
-          }}
-        />
-      )}
-
-      {verifyJob && (
-        <VerificationDialog
-          open
-          onOpenChange={(open) => !open && setVerifyOrderId(null)}
-          job={verifyJob}
-          persona={persona}
-          now={now}
-        />
-      )}
-
-      {pendingAction && pendingOrder && (
-        <TransitionDialog
-          open
-          onOpenChange={(open) => !open && setPendingAction(null)}
-          order={pendingOrder}
-          action={pendingAction.action}
-          persona={persona}
-          now={now}
-        />
-      )}
-
-      <CreateOrderDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        vendors={board.vendors}
         onCreated={(order) => highlight(order.id)}
+        state={{
+          selectedOrderId,
+          setSelectedOrderId,
+          pendingAction,
+          setPendingAction,
+          createOpen,
+          setCreateOpen,
+          claimOrderId,
+          setClaimOrderId,
+          verifyOrderId,
+          setVerifyOrderId,
+        }}
       />
     </div>
   );

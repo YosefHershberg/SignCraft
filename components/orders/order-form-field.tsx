@@ -1,7 +1,8 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -102,6 +103,36 @@ export function Field({
   );
 }
 
+/** A plain text `Input` bound to one form field: validates on blur (UI spec §4.5). */
+export function TextField({
+  name,
+  value,
+  error,
+  placeholder,
+  onChange,
+  onBlur,
+}: {
+  name: FieldName;
+  value: string;
+  error?: string | null;
+  placeholder?: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+}) {
+  return (
+    <Input
+      id={`order-${name}`}
+      placeholder={placeholder}
+      value={value}
+      aria-invalid={!!error}
+      aria-describedby={error ? fieldErrorId(name) : undefined}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      className={FIELD_INPUT_CLASS}
+    />
+  );
+}
+
 const longDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 /**
@@ -167,9 +198,12 @@ export function DateField({
   onChange: (iso: string) => void;
 }) {
   const day = isoToCalendarDay(value);
+  // Controlled so picking a day dismisses the calendar. Left open, it sits on
+  // top of the dialog's own footer and swallows the click on "Create draft".
+  const [open, setOpen] = useState(false);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           id="order-dueDate"
@@ -183,7 +217,14 @@ export function DateField({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar mode="single" selected={day} onSelect={(date) => onChange(date ? calendarDayToIso(date) : '')} />
+        <Calendar
+          mode="single"
+          selected={day}
+          onSelect={(date) => {
+            onChange(date ? calendarDayToIso(date) : '');
+            setOpen(false);
+          }}
+        />
       </PopoverContent>
     </Popover>
   );

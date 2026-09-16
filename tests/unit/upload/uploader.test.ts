@@ -170,6 +170,43 @@ describe('MultipartUploader', () => {
     expect(onAborted).toHaveBeenCalledTimes(1);
   });
 
+  it('(e2) abort() resolves once the server has been told, and rejects when that call fails', async () => {
+    const plan = planParts(4, 1);
+    const failing = makeApi({ abort: vi.fn(async () => { throw new Error('network down'); }) });
+    const ok = makeApi();
+    const stall: PutPart = vi.fn(() => new Promise<{ etag: string }>(() => {}));
+
+    const make = (assetId: string, api: UploaderApi) =>
+      new MultipartUploader({
+        assetId,
+        sizeBytes: 4,
+        plan,
+        source: () => new Blob([new Uint8Array(1)]),
+        api,
+        put: stall,
+        sleep: noopSleep,
+      });
+
+    const good = make('asset-ok', ok);
+    void good.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    await expect(good.abort()).resolves.toBeUndefined();
+
+    const bad = make('asset-bad', failing);
+    void bad.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    await expect(bad.abort()).rejects.toThrow('network down');
+    // The failed server call must not strand the uploader: the parts are down
+    // either way, so the local state is still 'aborted'.
+    expect(bad.state).toBe('aborted');
+
+    // A second abort() is a no-op that resolves rather than re-posting.
+    await expect(bad.abort()).resolves.toBeUndefined();
+    expect(failing.abort).toHaveBeenCalledTimes(1);
+  });
+
   it('(f) reports final progress before completing', async () => {
     const plan = planParts(3, 1);
     const api = makeApi();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reduceConnection } from '@/lib/realtime/use-realtime';
+import { reduceConnection, shouldRetryManually } from '@/lib/realtime/use-realtime';
 
 describe('reduceConnection', () => {
   it('open resets to live with zero failures', () => {
@@ -37,5 +37,33 @@ describe('reduceConnection', () => {
   it('stays degraded on further errors once past the threshold', () => {
     const state = { status: 'degraded' as const, failures: 5 };
     expect(reduceConnection(state, 'error')).toEqual({ status: 'degraded', failures: 6 });
+  });
+});
+
+describe('shouldRetryManually', () => {
+  // The numbers are the EventSource readyState constants; spelled out so the
+  // test says what it means without needing a DOM.
+  const CONNECTING = 0;
+  const OPEN = 1;
+  const CLOSED = 2;
+
+  it('is true only for a CLOSED stream — the fatal case EventSource will not retry', () => {
+    expect(shouldRetryManually(CLOSED)).toBe(true);
+  });
+
+  it('is false while the browser is still retrying on its own', () => {
+    expect(shouldRetryManually(CONNECTING)).toBe(false);
+    expect(shouldRetryManually(OPEN)).toBe(false);
+  });
+
+  it('drives enough retries to reach degraded, which a fatal error alone never would', () => {
+    // One fatal error without a manual retry leaves the app on 'reconnecting'
+    // forever; retrying turns each attempt into another counted failure.
+    let state = reduceConnection({ status: 'live', failures: 0 }, 'error');
+    expect(state.status).toBe('reconnecting');
+    while (shouldRetryManually(CLOSED) && state.status !== 'degraded') {
+      state = reduceConnection(state, 'error');
+    }
+    expect(state).toEqual({ status: 'degraded', failures: 3 });
   });
 });
