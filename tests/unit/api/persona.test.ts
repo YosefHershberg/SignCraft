@@ -39,6 +39,10 @@ describe('getPersona', () => {
   it('returns null when the header value is invalid', () => {
     expect(getPersona(reqWith({ header: 'vendor:not-an-id' }))).toBeNull();
   });
+
+  it('returns null when the sc_persona cookie is not valid percent-encoding', () => {
+    expect(getPersona(reqWith({ cookie: 'sc_persona=%' }))).toBeNull();
+  });
 });
 
 describe('requirePersona', () => {
@@ -60,6 +64,17 @@ describe('requirePersona', () => {
   it('throws ApiError(403, FORBIDDEN_FOR_PERSONA) when invalid', () => {
     expect(() => requirePersona(reqWith({ header: 'vendor:nope' }))).toThrow(ApiError);
   });
+
+  it('throws ApiError(403, FORBIDDEN_FOR_PERSONA) for an undecodable persona cookie, not a 500', () => {
+    try {
+      requirePersona(reqWith({ cookie: 'sc_persona=%' }));
+      throw new Error('expected requirePersona to throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError);
+      expect((e as ApiError).status).toBe(403);
+      expect((e as ApiError).code).toBe('FORBIDDEN_FOR_PERSONA');
+    }
+  });
 });
 
 describe('requireKind', () => {
@@ -67,6 +82,12 @@ describe('requireKind', () => {
     const req = reqWith({ header: `vendor:${VENDOR_ID}` });
     const persona = requireKind(req, 'vendor');
     expect(persona).toEqual({ kind: 'vendor', id: VENDOR_ID });
+  });
+
+  it('returns an installer persona narrowed to the requested kind', () => {
+    const req = reqWith({ header: `installer:${INSTALLER_ID}` });
+    const persona = requireKind(req, 'installer');
+    expect(persona).toEqual({ kind: 'installer', id: INSTALLER_ID });
   });
 
   it('throws 403 when the persona is a different kind', () => {

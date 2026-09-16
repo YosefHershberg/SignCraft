@@ -7,7 +7,13 @@ function cookiePersona(req: Request): string | null {
   if (!cookie) return null;
   for (const part of cookie.split('; ')) {
     const [name, ...rest] = part.split('=');
-    if (name === 'sc_persona') return decodeURIComponent(rest.join('='));
+    if (name === 'sc_persona') {
+      try {
+        return decodeURIComponent(rest.join('='));
+      } catch {
+        return null;
+      }
+    }
   }
   return null;
 }
