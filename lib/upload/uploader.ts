@@ -72,7 +72,7 @@ export class MultipartUploader {
     this.aborting = true;
     for (const controller of this.controllers.values()) controller.abort();
     this._state = 'aborted';
-    void this.opts.api.abort(this.opts.assetId);
+    void this.opts.api.abort(this.opts.assetId).catch(() => {});
     this.opts.onAborted?.();
   }
 
@@ -93,23 +93,26 @@ export class MultipartUploader {
         await this.runBatch(batchNumbers);
         if (this.aborting) return;
       }
+
+      if (this.aborting) return;
+
+      // Completion (final progress report + complete) is part of the same
+      // failure domain as the upload itself: a rejection here must still
+      // land in the failed/onError/api.abort path below, not escape as an
+      // unhandled rejection with `state` stuck at 'running'.
+      await this.opts.api.progress(this.opts.assetId, this.opts.sizeBytes);
+      const parts = Array.from(this.etags.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([partNumber, etag]) => ({ partNumber, etag }));
+      await this.opts.api.complete(this.opts.assetId, parts);
+      this._state = 'done';
+      this.opts.onDone?.();
     } catch (err) {
       if (this.aborting) return;
       this._state = 'failed';
       await this.opts.api.abort(this.opts.assetId).catch(() => {});
       this.opts.onError?.(err instanceof Error ? err : new Error(String(err)));
-      return;
     }
-
-    if (this.aborting) return;
-
-    await this.opts.api.progress(this.opts.assetId, this.opts.sizeBytes);
-    const parts = Array.from(this.etags.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([partNumber, etag]) => ({ partNumber, etag }));
-    await this.opts.api.complete(this.opts.assetId, parts);
-    this._state = 'done';
-    this.opts.onDone?.();
   }
 
   private async runBatch(partNumbers: number[]): Promise<void> {
@@ -150,6 +153,7 @@ export class MultipartUploader {
           controller.signal
         );
         this.controllers.delete(partNumber);
+        if (this.aborting) return;
         this.inFlightBytes.delete(partNumber);
         this.completedBytes.set(partNumber, size);
         this.etags.set(partNumber, etag);

@@ -7,7 +7,8 @@ export interface UploadPlan {
 }
 
 export function planParts(sizeBytes: number, partSize: number = PART_SIZE): UploadPlan {
-  const partCount = Math.ceil(sizeBytes / partSize);
+  // A zero-byte file still needs one (empty) part to upload/complete.
+  const partCount = Math.max(1, Math.ceil(sizeBytes / partSize));
   const lastPartSize = sizeBytes - (partCount - 1) * partSize;
   return { partSize, partCount, lastPartSize };
 }

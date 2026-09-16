@@ -16,6 +16,12 @@ describe('planParts', () => {
     expect(plan.partCount).toBe(1);
     expect(plan.lastPartSize).toBe(10 * 1024 * 1024);
   });
+
+  it('clamps a zero-byte file to one empty part', () => {
+    const plan = planParts(0);
+    expect(plan.partCount).toBe(1);
+    expect(plan.lastPartSize).toBe(0);
+  });
 });
 
 describe('partRange', () => {

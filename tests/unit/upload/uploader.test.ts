@@ -195,4 +195,29 @@ describe('MultipartUploader', () => {
     const completeOrder = (api.complete as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
     expect(progressOrder).toBeLessThan(completeOrder);
   });
+
+  it('(g) fails cleanly if api.complete rejects after all parts uploaded', async () => {
+    const plan = planParts(3, 1);
+    const api = makeApi({ complete: vi.fn(async () => { throw new Error('complete failed'); }) });
+    const put = immediatePut();
+    const onError = vi.fn();
+
+    const uploader = new MultipartUploader({
+      assetId: 'asset-7',
+      sizeBytes: 3,
+      plan,
+      source: () => new Blob([new Uint8Array(1)]),
+      api,
+      put,
+      sleep: noopSleep,
+      onError,
+    });
+
+    await uploader.start();
+
+    expect(uploader.state).toBe('failed');
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(api.abort).toHaveBeenCalledTimes(1);
+    expect(api.abort).toHaveBeenCalledWith('asset-7');
+  });
 });
