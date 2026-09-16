@@ -2,10 +2,14 @@ services:
   mongo:
     image: mongo:7
     command: ["--replSet", "rs0", "--bind_ip_all"]
-    ports: ["27017:27017"]
+    # MONGO_PORT lets you publish elsewhere when a local mongod already owns 27017.
+    ports: ["${MONGO_PORT:-27017}:27017"]
     volumes: ["mongo-data:/data/db"]
+    # Healthy only once the single-node replica set has elected itself PRIMARY:
+    # the first probe initiates the set, later probes fail (quit 1) until
+    # db.hello() reports a writable primary, so `app` never races the election.
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }\""]
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"try { rs.status() } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}) }; if (!db.hello().isWritablePrimary) quit(1)\""]
       interval: 5s
       timeout: 10s
       retries: 20
@@ -14,9 +18,10 @@ services:
     build: .
     # APP_PORT lets you publish elsewhere (e.g. 3001) when 3000 is taken by `pnpm dev`.
     ports: ["${APP_PORT:-3000}:3000"]
+    restart: on-failure
     environment:
       DATABASE_URL: mongodb://mongo:27017/signcraft?directConnection=true
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:${APP_PORT:-3000}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}

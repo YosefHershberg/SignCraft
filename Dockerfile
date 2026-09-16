@@ -8,7 +8,8 @@ WORKDIR /app
 FROM base AS deps
 # pnpm-workspace.yaml carries the `allowBuilds` gate so the Prisma/esbuild postinstalls run.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY prisma ./prisma
+# Only the schema is needed by the postinstall `prisma generate`; keeps the install layer cacheable.
+COPY prisma/schema.prisma ./prisma/
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
@@ -21,9 +22,8 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml next.config.ts tsconfig.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml next.config.ts ./
 COPY prisma ./prisma
-COPY lib ./lib
 COPY docker/entrypoint.sh ./entrypoint.sh
 # .gitattributes pins *.sh to LF; the sed is belt-and-braces for older checkouts.
 RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh
