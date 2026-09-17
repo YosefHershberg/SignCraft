@@ -216,3 +216,18 @@ Decisions made or changed during implementation are appended to the record they 
 **Amended 2026-09-16 — Atlas, and a third test category.** `pnpm test:integration` needs no Docker: it runs against a **dedicated database name on the Atlas cluster** (`signcraft_test`), derived from `.env` by rewriting the path segment of `DATABASE_URL`. The override is mandatory because `resetDb()` wipes every collection. The cost is latency — an M0 write round trip is 2–3 s, so the suite takes about 4.5 minutes and runs serially (`fileParallelism: false`, 30 s timeout) — bought against never having a second, differently-configured database to reason about.
 
 A third category was added below the "no Playwright" line: a small number of **component tests** with `@testing-library/react` under jsdom (`tests/unit/jobs/job-chip.test.tsx`, via a per-file `// @vitest-environment jsdom` pragma). Rationale: the job chip renders claim state that is only correct if the lazy-expiry view and the countdown formatting agree, and that is cheap to assert on rendered output and expensive to assert any other way. It stays a handful of tests rather than a component-testing strategy: the invariants live in `lib/domain`, which is tested directly. Totals: **274 unit** tests in 25 files, **47 integration** tests in 8 files.
+
+## ADR-018 — CI on GitHub Actions, CD through Vercel's Git integration
+
+*Added 2026-09-17.*
+
+**Context.** Nothing checked a change before it reached the live URL: the Vercel project was already connected to the GitHub repository and deployed every push to `main`, but lint, typecheck, both test suites and the build ran only when someone remembered to run them locally.
+
+**Decision.** One GitHub Actions workflow, `.github/workflows/ci.yml`, on every pull request and every push to `main`. Job `verify` installs from the lockfile and runs lint, typecheck, unit tests and `pnpm build` with no secrets. Job `integration` runs after it, only when the `TEST_DATABASE_URL` repository secret exists: `pnpm db:push` and then `pnpm test:integration` against `signcraft_test`, in a single concurrency group so two runs never wipe the database under each other. Deployment stays with Vercel's Git integration: a preview per PR push, production per push to `main`. The workflow has no deploy step and GitHub holds no Vercel token.
+
+**Alternatives.**
+- Deploy from Actions with the Vercel CLI (`vercel pull` / `vercel build --prod` / `vercel deploy --prebuilt --prod`, Git deployments disabled in `vercel.json`): CI becomes a hard gate by construction, at the cost of a long-lived `VERCEL_TOKEN` in GitHub, a second build definition to keep in step with Vercel's, and preview URLs that the workflow has to publish itself.
+- Integration tests on a Mongo service container: free and fast, but not a replica set without extra setup, and not the database production runs on — the reason ADR-003 was amended.
+- Integration tests only on `main`: fewer Atlas runs, but a broken claim guarantee would be found after the merge rather than on the PR.
+
+**Consequences.** Vercel builds `main` in parallel with CI and, by default, promotes the build without waiting for it. Gating production on CI is two settings, neither enabled yet: branch protection on `main` requiring both jobs, and Vercel Deployment Checks importing the same GitHub Actions results. Integration runs are serialised (about 4.5 minutes each) because they share one database. Fork PRs never receive secrets, so for them `integration` is skipped with a warning rather than failed. Schema changes are not deployed: `pnpm db:push` against production stays a manual step (Mongo has no migrations).

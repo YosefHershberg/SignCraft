@@ -516,6 +516,8 @@ Vercel: Node runtime for all API routes, Fluid compute on, `maxDuration` set on 
 
 **Amended 2026-09-16:** build command is `pnpm build` (`prisma generate && next build`); `maxDuration = 300` is set on `/api/events`. R2 CORS `AllowedOrigins` must list both `http://localhost:3000` and the Vercel origin (`https://*.vercel.app` is acceptable), with `AllowedHeaders: ["*"]` and `ExposeHeaders: ["ETag"]` — omitting either breaks uploads in a different way (README, upload section). Windows note for local work: `pnpm build` can fail with `EPERM` on the Prisma query-engine DLL while `pnpm dev` holds it; stop the dev server first.
 
+**Amended 2026-09-17 — CI/CD (ADR-018).** `.github/workflows/ci.yml` runs lint, typecheck, unit tests and `pnpm build` on every PR and push to `main` without secrets, then `pnpm db:push` + `pnpm test:integration` against `signcraft_test` when the `TEST_DATABASE_URL` repository secret is set (one run at a time). Deployment stays with Vercel's GitHub integration (preview per PR push, production per push to `main`); Node is 24.x in both. GitHub-hosted runners are covered by the same `0.0.0.0/0` Atlas entry as Vercel.
+
 ## 17. Out of scope (explicitly)
 
 Auth, multi-tenancy, vendor pool bidding, installer scheduling, payments, email, resumable uploads across sessions, i18n, Redis, cron.
