@@ -1,5 +1,6 @@
 'use client';
 
+/** lib/hooks/use-now.ts — the one shared clock every countdown UI reads from. */
 import { useEffect, useState } from 'react';
 
 /**

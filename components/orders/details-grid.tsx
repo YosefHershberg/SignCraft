@@ -1,3 +1,6 @@
+// components/orders — read-only facts about the order for the detail sheet.
+// Pure presentation of the `OrderDTO` the sheet reads live from the cache.
+
 import { SIGN_TYPE_LABEL } from '@/lib/domain/status-meta';
 import type { OrderDTO } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
@@ -9,6 +12,10 @@ function formatFullDate(iso: string): string {
   );
 }
 
+/**
+ * One label/value pair of the grid. `mono` is for measurements and counts,
+ * `wide` spans both columns (notes), `muted` de-emphasises optional text.
+ */
 function Cell({
   label,
   value,

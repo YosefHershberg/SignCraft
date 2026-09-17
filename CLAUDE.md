@@ -14,6 +14,7 @@ Read these before changing behaviour. If code and spec disagree, fix one and say
 - `docs/superpowers/specs/2026-09-16-signcraft-decisions.md` — 17 ADRs with alternatives. Do not re-litigate a decision silently; add or amend an ADR.
 - `docs/superpowers/specs/2026-09-16-signcraft-ui-pages-and-flows.md` — every screen, state, and flow.
 - `docs/design/` — visual design from Claude Design: `DESIGN.md` (tokens: colours, type scale, spacing, status hues) plus `screens/1a`–`1h` as reference HTML (board, detail sheet, dialogs, mobile, tablet). Use it for how things look; the UI spec wins on behaviour. Rebuild screens with Tailwind + Shadcn — never paste exported HTML into a component.
+- `public/openapi.yaml` — the API contract as implemented, rendered at `/api-docs`. `tests/unit/api/openapi.test.ts` fails if a route and the spec drift. When you add or change a route, update the spec in the same change.
 - `README.md` / `EXPLANATIONS.md` — what the reviewer is told. If you change behaviour, change these.
 
 ## Stack (mandated, do not swap)
@@ -34,18 +35,19 @@ The `mongodb` native driver is allowed **only** in `lib/db/mongo.ts` for change 
 
 ## Layout
 
-See architecture spec §13. Short version: `app/` (page + `api/` routes), `components/` (by feature, `ui/` is Shadcn), `lib/` (`domain`, `services`, `db`, `storage`, `realtime`, `upload`, `api`, `query`, `board`, `persona`, `hooks`), `prisma/`, `tests/{unit,integration}`.
+See architecture spec §13. Short version: `app/` (page + `api/` routes + `api-docs/`, the Swagger UI page), `components/` (by feature, `ui/` is Shadcn), `lib/` (`domain`, `services`, `db`, `storage`, `realtime`, `upload`, `api`, `query`, `board`, `persona`, `hooks`), `prisma/`, `public/openapi.yaml`, `tests/{unit,integration}`.
 
 ## Commands
 
 ```
 pnpm dev                 # needs .env with an Atlas DATABASE_URL and R2 credentials
-pnpm test                # 274 unit tests, no infrastructure, ~12 s
+pnpm test                # 325 unit tests, no infrastructure, ~12 s
 pnpm test:integration    # 47 integration tests against Atlas, ~4.5 min — needs the override below
 pnpm typecheck           # tsc --noEmit
 pnpm build               # prisma generate && next build
 pnpm prisma db push      # schema sync (Mongo has no migrations)
 pnpm db:seed             # idempotent seed: 3 vendors, 4 installers, 8 orders — a ONE-TIME step
+pnpm --package=@redocly/cli dlx redocly lint public/openapi.yaml   # validate the OpenAPI spec
 ```
 
 `pnpm db:seed` skips orders whose `orderNumber` already exists, so re-running it will **not** restore orders that were moved through the board. Do not re-seed to "reset" the demo.
@@ -97,6 +99,7 @@ The fastest way to see the three graded behaviours by hand (full checklist in `R
 - Persona comes from the `x-persona` header (`ops` | `vendor:<id>` | `installer:<id>`), parsed only in `lib/api/persona.ts` over the pure `lib/domain/personas.ts`.
 - Tuning constants live in `lib/domain/constants.ts`. Change them there, not inline.
 - Update the README "Trade-offs" section whenever an ADR changes.
+- Every module carries a file header and JSDoc on its exports explaining its role in the pipeline; keep them accurate when you change behaviour.
 
 ## Environment
 

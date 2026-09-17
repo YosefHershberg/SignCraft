@@ -1,3 +1,7 @@
+// components/board — the loading state of an order card. Shown by
+// `StatusColumn` and the mobile list while `KanbanBoard.loading` is true,
+// i.e. between the server-rendered shell and the client bootstrap query.
+
 import { Skeleton } from '@/components/ui/skeleton';
 
 /** First-paint placeholder with the order card's silhouette (UI spec §4.2). */

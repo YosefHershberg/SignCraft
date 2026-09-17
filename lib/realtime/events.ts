@@ -3,6 +3,12 @@
 import { toAssetDTO, toJobDTO, toOrderDTO } from '@/lib/services/dto';
 import type { SseEvent } from '@/lib/domain/types';
 
+/**
+ * The minimal shape this module needs out of a Mongo change-stream document —
+ * deliberately not the driver's `ChangeStreamDocument` type, so this file (and
+ * `sse.ts`, which is unit-tested against fakes) never imports the `mongodb`
+ * driver (Invariant: the native driver is confined to `lib/db/mongo.ts`).
+ */
 export interface ChangeLike {
   operationType: string;
   ns: { coll: string };
@@ -10,8 +16,18 @@ export interface ChangeLike {
   _id: { _data: string };
 }
 
+/** Change types worth forwarding; deletes and other ops are dropped (the app never hard-deletes). */
 const WRITE_OPS = new Set(['insert', 'update', 'replace']);
 
+/**
+ * Maps one change-stream document to the typed SSE frame `createSseStream`
+ * serialises. The resume token (`change._id._data`) becomes the frame's `id`,
+ * which the client echoes back as `Last-Event-ID`/`?after=` on reconnect so
+ * the stream picks up exactly where it left off. The DTO mappers
+ * (`toOrderDTO`/`toJobDTO`/`toAssetDTO`) apply the same lazy-expiry rule as
+ * the REST API, so a frame for a `CLAIMED` job whose TTL has already lapsed
+ * is never sent as anything but `OPEN` (Invariant 3).
+ */
 export function changeToEvent(change: ChangeLike, now: Date): { id: string; event: SseEvent } | null {
   if (!WRITE_OPS.has(change.operationType) || !change.fullDocument) return null;
 
@@ -39,6 +55,7 @@ export function changeToEvent(change: ChangeLike, now: Date): { id: string; even
   }
 }
 
+/** Serialises one frame to the `text/event-stream` wire format (`id:`/`event:`/`data:` lines, blank line terminated). */
 export function formatSse(frame: { id?: string; event: string; data: unknown }): string {
   const lines: string[] = [];
   if (frame.id !== undefined) lines.push(`id: ${frame.id}`);

@@ -1,3 +1,8 @@
+// components/orders — the audit trail at the foot of the detail sheet. Renders
+// the `history` array that `transitionOrder` (`lib/services/orders.ts`) pushes
+// onto the order in the same conditional update as the status change, so every
+// row here corresponds to exactly one accepted transition (pipeline 1).
+
 import { formatDue, formatTime } from '@/lib/domain/format';
 import { historyLine } from '@/lib/domain/history';
 import { STATUS_META } from '@/lib/domain/status-meta';
@@ -6,6 +11,12 @@ import type { InstallerDTO, OrderDTO, VendorDTO } from '@/lib/domain/types';
 /**
  * Section 6 of the detail sheet: newest first, a 1px vertical rule with
  * status-coloured dots (DESIGN.md "Detail sheet", UI spec §4.4).
+ *
+ * The sentence for each row comes from `historyLine` (`lib/domain/history.ts`),
+ * which turns the `(from, to, actor)` triple into prose and names the actor
+ * from `vendors`/`installers`. Because history is embedded on the order and
+ * the sheet reads the order live, a transition confirmed in another tab shows
+ * up here on the same SSE frame that moved the card.
  */
 export function HistoryTimeline({
   order,

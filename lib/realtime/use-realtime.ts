@@ -9,8 +9,10 @@ import { DEGRADED_AFTER_FAILURES, SSE_RETRY_MS } from '@/lib/domain/constants';
 import type { BootstrapDTO, SseEvent } from '@/lib/domain/types';
 import { applyEvent, shouldToastNewJob } from './apply-event';
 
+/** The four states `ConnectionIndicator` renders (UI spec §7.7); `degraded` is also what flips `useBootstrap`'s poll on. */
 export type ConnectionStatus = 'connecting' | 'live' | 'reconnecting' | 'degraded';
 
+/** `reduceConnection`'s full state: the status plus the running failure count that decides when `degraded` kicks in. */
 interface ConnectionState {
   status: ConnectionStatus;
   failures: number;
@@ -50,24 +52,32 @@ export function shouldRetryManually(readyState: number): boolean {
 
 // Module-level store so other hooks (useBootstrap) can read the live
 // connection status without prop-drilling or a second provider/context.
+// `useBootstrap` (lib/query/hooks.ts) reads it via `useSyncExternalStore` and
+// only then flips its `refetchInterval` on — this is the single deliberate
+// exception to "no DB polling" (Invariant 4), and it exists purely as a
+// fallback for the window the SSE connection is down.
 let currentStatus: ConnectionStatus = 'connecting';
 const listeners = new Set<() => void>();
 
+/** Updates the module-level status and notifies subscribers, but only on an actual change (`useSyncExternalStore` needs stable snapshots between calls). */
 function publish(next: ConnectionStatus): void {
   if (currentStatus === next) return;
   currentStatus = next;
   listeners.forEach((listener) => listener());
 }
 
+/** The `getSnapshot` half of the store, for `useSyncExternalStore`. */
 export function getConnectionStatus(): ConnectionStatus {
   return currentStatus;
 }
 
+/** The `subscribe` half of the store, for `useSyncExternalStore`. */
 export function subscribeConnectionStatus(callback: () => void): () => void {
   listeners.add(callback);
   return () => listeners.delete(callback);
 }
 
+/** The frame names this hook listens for; each maps 1:1 to an `SseEvent['type']` handled by `applyEvent`. */
 const EVENT_NAMES = [
   'order.created',
   'order.updated',
@@ -103,6 +113,12 @@ export function useRealtime(): ConnectionStatus {
     let closed = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
+    /**
+     * Applies a new connection state to both this component's render (`setStatus`)
+     * and the module-level store (`publish`), and invalidates once on the
+     * degraded -> live transition — the one moment a missed write during the
+     * outage could otherwise sit stale until the next unrelated frame arrives.
+     */
     function setState(next: ConnectionState) {
       const wasDegraded = stateRef.current.status === 'degraded';
       stateRef.current = next;
@@ -113,6 +129,13 @@ export function useRealtime(): ConnectionStatus {
       }
     }
 
+    /**
+     * Builds the listener for one named SSE event: tracks the last event id
+     * (so a reconnect can resume from it), parses the frame's `doc`, and
+     * patches the bootstrap cache through the same `applyEvent` reducer a
+     * mutation's `onSuccess` uses (`lib/query/hooks.ts`), so this tab's own
+     * writes and every other tab's writes converge on identical cache state.
+     */
     function handleEvent(name: SseEvent['type']) {
       return (event: Event) => {
         const messageEvent = event as MessageEvent<string>;
@@ -134,6 +157,13 @@ export function useRealtime(): ConnectionStatus {
       };
     }
 
+    /**
+     * Opens (or reopens) the EventSource. Passing `?after=<lastEventId>` once
+     * one is known is what makes a reconnect resume rather than replay the
+     * whole board: the server passes that token straight to `db.watch()`'s
+     * `resumeAfter`, so nothing written while this tab was offline is missed
+     * and nothing already applied is repeated.
+     */
     function connect() {
       if (closed) return;
       const url = lastIdRef.current ? `/api/events?after=${lastIdRef.current}` : '/api/events';

@@ -1,5 +1,10 @@
 'use client';
 
+// components/layout — the stand-in for login. Selecting an entry calls
+// `setPersona` on `lib/persona/persona-context.tsx`, which updates this tab's
+// React state (and the `sc_persona` cookie for the *next* first render); every
+// subsequent request from this tab carries the new `x-persona` header.
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +17,7 @@ import { personaLabel } from '@/lib/domain/personas';
 import type { InstallerDTO, VendorDTO } from '@/lib/domain/types';
 import { usePersona } from '@/lib/persona/persona-context';
 
+/** "Dana K." → "DK", "Ops" → "O"; first + last word, upper-cased, for the avatar circle. */
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
@@ -20,6 +26,14 @@ function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
+/**
+ * Avatar + name/role trigger with a menu of Ops, every vendor and every
+ * installer (UI spec §4.1). `vendors`/`installers` are the bootstrap lists, so
+ * the same ids the server validates against are the only ones offered;
+ * `personaLabel` resolves the current persona back to a display name. Nothing
+ * here refetches: `useRealtime` keeps its EventSource across a switch, and the
+ * board simply re-filters on the next render.
+ */
 export function PersonaSwitcher({ vendors, installers }: { vendors: VendorDTO[]; installers: InstallerDTO[] }) {
   const { persona, setPersona } = usePersona();
   const { name, role } = personaLabel(persona, vendors, installers);

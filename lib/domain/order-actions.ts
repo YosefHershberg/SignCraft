@@ -1,3 +1,9 @@
+/**
+ * The client-facing face of `permissions.ts`: builds an `OrderCtx` from an
+ * `OrderDTO` and decides which order buttons a surface (action bar, card ⋯
+ * menu, job panel) actually shows. Pure; used by `components/orders/*` and
+ * `components/jobs/job-panel.tsx`.
+ */
 import { orderActionsFor, type OrderCtx } from './permissions';
 import type { ActionAvailability, OrderDTO, Persona } from './types';
 

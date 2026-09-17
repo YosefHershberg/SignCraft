@@ -1,5 +1,10 @@
 'use client';
 
+// components/board — the below-md navigation for the board: one pill per
+// status the persona can see (`mobileStatuses`), with the selected status's
+// list rendered as children. `KanbanBoard` owns the selected tab so a
+// realtime update cannot move the user off it.
+
 import type { ReactNode } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { STATUS_META } from '@/lib/domain/status-meta';

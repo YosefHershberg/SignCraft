@@ -1,3 +1,7 @@
+/**
+ * tests/helpers/env.ts — Vitest integration setup file: loads `.env` and
+ * immediately guards the target database, before any test runs.
+ */
 import { config } from 'dotenv';
 import { assertTestDatabase } from './db-name';
 

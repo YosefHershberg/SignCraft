@@ -1,5 +1,11 @@
 'use client';
 
+// components/orders — the "New order" form. Where every order enters the
+// state machine (as DRAFT): field state lives here, field rendering and the
+// string↔schema coercion live in `order-form-field.tsx`, and the request goes
+// through `useCreateOrder` to `POST /api/orders`, which validates the very
+// same `createOrderSchema` server-side.
+
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -35,9 +41,23 @@ import {
 } from './order-form-field';
 import { useRestoreFocus, visibleElement } from './use-restore-focus';
 
+/** The sign-type Select's options, built once from the domain enum so the form cannot drift from it. */
 const SIGN_TYPE_OPTIONS = SIGN_TYPES.map((value) => ({ value, label: SIGN_TYPE_LABEL[value] }));
 
-/** Create Order dialog (UI spec §4.5, design 1e). Ops only. */
+/**
+ * Create Order dialog (UI spec §4.5, design 1e). Ops only.
+ *
+ * Validation is split in two: `fieldError` runs per field (on blur, or on
+ * change for controls that never blur) to produce the inline message, while
+ * `parsed` re-runs the whole `createOrderSchema` on every render to gate the
+ * submit button. Both go through `buildInput`, so what is validated is exactly
+ * the body that will be sent, and a form that passes here cannot fail the
+ * route's `parseBody(createOrderSchema)` with a VALIDATION_ERROR.
+ *
+ * On success the new order lands in the cache via `setOrderInCache` (same
+ * reducer as SSE), the board flashes it through `onCreated`, and the dialog
+ * closes; a server error is rendered inline by `InlineError`, never toasted.
+ */
 export function CreateOrderDialog({
   open,
   onOpenChange,
@@ -55,17 +75,25 @@ export function CreateOrderDialog({
   const [serverError, setServerError] = useState<ApiClientError | null>(null);
   const create = useCreateOrder();
 
+  /** The whole form against the API schema; `success` is the only thing that enables "Create draft". */
   const parsed = createOrderSchema.safeParse(buildInput(values));
 
-  /** Select and Calendar never blur, so they validate on change instead. */
+  /**
+   * Updates one field. Select and Calendar never blur, so they validate on
+   * change instead (`validateNow`); text inputs validate on change only once
+   * they already carry an error, so a message clears as soon as the user fixes
+   * the value rather than waiting for the next blur.
+   */
   function set(name: FieldName, value: string, validateNow = false) {
     const next = { ...values, [name]: value };
     setValues(next);
     if (validateNow || errors[name]) setErrors((e) => ({ ...e, [name]: fieldError(name, next) }));
   }
 
+  /** `onBlur` handler factory: the blur-time validation UI spec §4.5 asks for. */
   const blur = (name: FieldName) => () => setErrors((e) => ({ ...e, [name]: fieldError(name, values) }));
 
+  /** Back to a pristine form; shared by the close effect below and the success path. */
   const reset = useCallback(() => {
     setValues(EMPTY_VALUES);
     setErrors({});
@@ -86,6 +114,12 @@ export function CreateOrderDialog({
     useCallback(() => visibleElement('[aria-label="New order"]'), [])
   );
 
+  /**
+   * Sends `parsed.data` — the schema's output, not the raw strings — so the
+   * body is already coerced (numbers, `notes: null`) when it hits the route.
+   * The `!parsed.success` guard is belt-and-braces: the button is disabled in
+   * that state.
+   */
   function submit() {
     if (!parsed.success) return;
     setServerError(null);
@@ -101,6 +135,7 @@ export function CreateOrderDialog({
     });
   }
 
+  /** A `TextField` wired to this form's state; the three free-text fields differ only by name. */
   const text = (name: FieldName, placeholder?: string) => (
     <TextField
       name={name}

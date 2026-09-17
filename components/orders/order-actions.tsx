@@ -1,5 +1,10 @@
 'use client';
 
+// components/orders — the detail sheet's action bar and the second entry
+// point into pipeline 1 (the card's ⋯ menu is the first). Buttons are derived
+// from the pure `visibleOrderActions`, so the sheet offers exactly what the
+// server will accept and greys out — with the guard reason — what it will not.
+
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { visibleOrderActions } from '@/lib/domain/order-actions';
@@ -7,6 +12,14 @@ import { ACTION_LABEL } from '@/lib/domain/status-meta';
 import type { ActionAvailability, OrderAction, OrderDTO, Persona } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
 
+/**
+ * One transition button. `availability` comes straight from
+ * `orderActionsFor`: `enabled: false` with a `reason` means the persona may
+ * take this action in principle but a guard currently fails (e.g. "Upload a
+ * file first"), so the button stays visible but disabled and the reason is
+ * shown as a tooltip — the tooltip-on-disabled pattern the comment below
+ * explains. Cancel is styled destructive to match its confirm dialog.
+ */
 function ActionButton({
   availability,
   onAction,
@@ -49,7 +62,14 @@ function ActionButton({
   );
 }
 
-/** Section 2 of the detail sheet: the persona's actions for this order (UI spec §4.4, §6). */
+/**
+ * Section 2 of the detail sheet: the persona's actions for this order (UI spec
+ * §4.4, §6). Installer `complete` is filtered out by `visibleOrderActions`
+ * because it belongs to `JobPanel`, which is guarded by the claim. The first
+ * disabled action's reason is repeated as a right-aligned hint so it is
+ * readable without hovering. Clicking hands `(order, action)` to the
+ * dashboard, which opens `TransitionDialog`.
+ */
 export function OrderActions({
   order,
   persona,

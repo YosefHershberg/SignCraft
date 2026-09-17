@@ -1,6 +1,12 @@
-// Pure DTO normalisation. No Prisma import: this works on plain objects that
-// come either from Prisma results (Date, bigint, string ids) or straight off
-// a MongoDB change-stream fullDocument (ObjectId-like, Date, Long-like).
+/**
+ * lib/services: the only DB-facing code (Invariant 7). This file maps raw
+ * Mongo/Prisma shapes to the wire DTOs in `lib/domain/types.ts`. No Prisma
+ * import: `normalise` works on plain objects that come either from Prisma
+ * results (Date, bigint, string ids) or straight off a MongoDB change-stream
+ * `fullDocument` (ObjectId-like, Date, Long-like, `_id`) — the same mapper
+ * has to serve both the REST path and `lib/realtime/events.ts#changeToEvent`
+ * (architecture §10).
+ */
 import { toPublicJob } from '@/lib/domain/claims';
 import type { AssetDTO, JobDTO, OrderDTO } from '@/lib/domain/types';
 
@@ -37,6 +43,13 @@ export function normalise<T = unknown>(value: unknown): T {
   return value as T;
 }
 
+/**
+ * Raw job (Prisma row or change-stream doc) → `JobDTO`, with lazy expiry
+ * applied via `toPublicJob`. This is Invariant 3's enforcement point: every
+ * job the server hands out, whether from a REST response, `getBootstrap`, or
+ * an SSE frame, goes through here, so an expired claim always reads as OPEN
+ * regardless of what the DB row still says.
+ */
 export function toJobDTO(raw: unknown, now: Date): JobDTO {
   const normalised = normalise<Record<string, unknown>>(raw);
   const withDefaults = {
@@ -47,10 +60,18 @@ export function toJobDTO(raw: unknown, now: Date): JobDTO {
   return toPublicJob(withDefaults, now);
 }
 
+/** Raw asset (Prisma row or change-stream doc) → `AssetDTO`; just `normalise` under a name that matches its siblings. */
 export function toAssetDTO(raw: unknown): AssetDTO {
   return normalise<AssetDTO>(raw);
 }
 
+/**
+ * Raw order (with its `installJob`/`assets` relations, or without — a
+ * change-stream order document carries neither) → `OrderDTO`. Nested job and
+ * assets are re-mapped through `toJobDTO`/`toAssetDTO` so lazy expiry reaches
+ * the embedded job too; missing relations default to `null`/`[]` rather than
+ * leaking `undefined` onto the wire.
+ */
 export function toOrderDTO(raw: unknown, now: Date): OrderDTO {
   const normalised = normalise<Record<string, unknown>>(raw);
   const installJobRaw = normalised.installJob;

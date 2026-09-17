@@ -1,5 +1,7 @@
 'use client';
 
+// Dashboard shell: renders the four dialogs and the detail sheet that
+// `DashboardBoard` (dashboard.tsx) can raise, driven by the overlay state it owns.
 import { ClaimDialog } from '@/components/jobs/claim-dialog';
 import { VerificationDialog } from '@/components/jobs/verification-dialog';
 import { CreateOrderDialog } from '@/components/orders/create-order-dialog';

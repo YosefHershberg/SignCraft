@@ -1,3 +1,10 @@
+/**
+ * lib/services/assets.ts — pipeline 3 (direct-to-cloud upload), the server
+ * side of every step except the presigned PUT itself: creating the Asset row
+ * and the R2 multipart upload, presigning part URLs, recording progress, and
+ * completing/aborting. Bytes never pass through here (Invariant 5) — only
+ * metadata and calls into `lib/storage/r2.ts`.
+ */
 import { prisma } from '@/lib/db/prisma';
 import { ApiError, fromVerdict } from '@/lib/api/errors';
 import { checkUpload } from '@/lib/domain/permissions';
@@ -9,11 +16,19 @@ import { planParts } from '@/lib/upload/plan';
 import { toAssetDTO } from './dto';
 
 /**
- * Creates an Asset and the R2 multipart upload it will be uploaded through.
- * Only ops may attach files, and only while the order is in an uploadable
- * status (DRAFT|SUBMITTED, per `checkUpload`). The Asset is created PENDING
- * with a placeholder storageKey (the real key needs the generated asset id),
- * then updated to UPLOADING once the multipart upload exists.
+ * Creates an Asset and the R2 multipart upload it will be uploaded through
+ * (pipeline 3, step 1). Only ops may attach files, and only while the order
+ * is in an uploadable status (DRAFT|SUBMITTED, per `checkUpload`). The Asset
+ * is created PENDING with a placeholder storageKey (the real key needs the
+ * generated asset id, hence create-then-update rather than one insert), then
+ * updated to UPLOADING once the multipart upload exists. If R2 rejects the
+ * multipart create, the row is kept as FAILED (not deleted) so the UI can
+ * offer Retry instead of the asset silently vanishing.
+ *
+ * @throws {ApiError} 403 if `persona` is not ops, 404 if the order does not
+ * exist, the mapped `Denial` (400 GUARD_FAILED ORDER_NOT_UPLOADABLE) if the
+ * order cannot accept files, or the storage error from `createMultipart`
+ * (502 STORAGE_ERROR).
  */
 export async function createAsset(
   input: CreateAssetInput,
@@ -75,7 +90,17 @@ async function assertOrderStillUploadable(orderId: string, persona: Persona): Pr
   if (!verdict.ok) throw fromVerdict(verdict);
 }
 
-/** Presigns URLs for the requested part numbers of an in-flight multipart upload. */
+/**
+ * Presigns URLs for the requested part numbers of an in-flight multipart
+ * upload (pipeline 3, step 3). Called once per batch of up to
+ * `PRESIGN_BATCH` part numbers; re-validates the order via
+ * `assertOrderStillUploadable` on every call since a long upload can outlive
+ * the order's uploadable window.
+ *
+ * @throws {ApiError} 404 if the asset (or its order) does not exist, the
+ * mapped `Denial` if the order is no longer uploadable, 409 VERSION_CONFLICT
+ * if the asset is not PENDING/UPLOADING or has no active `uploadId`.
+ */
 export async function presignParts(
   assetId: string,
   partNumbers: number[],
@@ -99,7 +124,14 @@ export async function presignParts(
   );
 }
 
-/** Records client-reported upload progress. A no-op unless the asset is UPLOADING. */
+/**
+ * Records client-reported upload progress (ADR-016; pipeline 3, step 4). A
+ * no-op unless the asset is UPLOADING — a late progress ping for a completed,
+ * failed or aborted asset must not resurrect its numbers, and an unknown id
+ * fails silently rather than 404ing (the route treats this call as
+ * best-effort). `bytesUploaded` is clamped to `sizeBytes` in case the client
+ * over-reports.
+ */
 export async function reportProgress(assetId: string, bytesUploaded: number): Promise<void> {
   const asset = await prisma.asset.findUnique({ where: { id: assetId } });
   if (!asset || asset.status !== 'UPLOADING') return;
@@ -115,9 +147,16 @@ export async function reportProgress(assetId: string, bytesUploaded: number): Pr
 }
 
 /**
- * Completes a multipart upload. If R2 reports STORAGE_ERROR the asset is
- * marked FAILED and the error is rethrown so the caller sees it; on success
- * the asset is marked UPLOADED and fully progressed.
+ * Completes a multipart upload (pipeline 3, step 5). Parts are sorted by
+ * number before the R2 call, since the client may report them out of order
+ * (a slower worker in `MultipartUploader`'s pool can finish last). If R2
+ * reports STORAGE_ERROR the asset is marked FAILED and the error is
+ * rethrown so the caller sees it; on success the asset is marked UPLOADED
+ * and fully progressed.
+ *
+ * @throws {ApiError} 404 if the asset (or its order) does not exist, the
+ * mapped `Denial` if the order is no longer uploadable, 409 VERSION_CONFLICT
+ * if the asset is not UPLOADING, or 502 STORAGE_ERROR (asset left FAILED).
  */
 export async function completeAsset(
   assetId: string,
@@ -159,6 +198,8 @@ export async function completeAsset(
  * retries reports `'error'` and the asset lands FAILED, so the row offers Retry
  * (UI spec §7.6); a user pressing ✕ leaves it ABORTED. Either way the R2
  * multipart is abandoned, so no orphaned parts are left behind.
+ *
+ * @throws {ApiError} 404 if the asset does not exist.
  */
 export async function abortAsset(assetId: string, reason: AbortReason = 'user'): Promise<void> {
   const asset = await prisma.asset.findUnique({ where: { id: assetId } });

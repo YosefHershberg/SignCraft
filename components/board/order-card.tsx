@@ -1,5 +1,11 @@
 'use client';
 
+// components/board — the card for one order, and the board's entry point into
+// two of the three graded pipelines: the ⋯ menu starts an order transition
+// (pipeline 1) and the Claim button starts the claim race (pipeline 2). It
+// only decides *what to offer* via the pure `lib/domain` helpers; the
+// dashboard owns the dialogs that actually send the request.
+
 import { ClaimButton } from '@/components/jobs/claim-button';
 import { JobChip } from '@/components/jobs/job-chip';
 import { UploadProgressBar } from '@/components/uploads/upload-progress-bar';
@@ -19,14 +25,29 @@ import { cn } from '@/lib/utils';
 export interface OrderCardProps {
   order: OrderDTO;
   persona: Persona;
+  /** Resolved by the board from `vendorNames`; "Vendor unassigned" if the id is unknown. */
   vendorName: string;
+  /** Lets `JobChip`/`ClaimButton` print the claimant's name rather than an id. */
   installers: InstallerDTO[];
+  /**
+   * Epoch ms from the board's shared clock. Every "can this persona act?"
+   * question below is answered as of this instant, so the ⋯ menu, the chip's
+   * countdown and the Claim button all agree on whether a claim has lapsed.
+   */
   now: number;
+  /** Click/Enter/Space on the card body; opens the detail sheet for this order. */
   onOpen: (orderId: string) => void;
+  /** Just changed status: 600 ms teal ring (see `useStatusHighlight`). */
   highlight?: boolean;
+  /** This card's detail sheet is open: teal border. */
   selected?: boolean;
-  /** Task 13 wires the overflow menu; without it the ⋯ button is not rendered. */
+  /**
+   * Task 13 wires the overflow menu; without it the ⋯ button is not rendered.
+   * Pipeline 1 step 1: the chosen item becomes the dashboard's pending action
+   * and opens `components/orders/transition-dialog.tsx`.
+   */
   onAction?: (order: OrderDTO, action: OrderAction) => void;
+  /** Passed to `JobChip`: the claimant's "Verify" opens `VerificationDialog` (pipeline 2). */
   onVerify?: (job: JobDTO) => void;
   /** Opens the claim dialog from the card's own Claim button (design 1b). */
   onClaim?: (job: JobDTO) => void;
@@ -34,7 +55,20 @@ export interface OrderCardProps {
   onClaimExpired?: (key: string) => void;
 }
 
-/** One order on the board (DESIGN.md "Order card", UI spec §4.2). */
+/**
+ * One order on the board (DESIGN.md "Order card", UI spec §4.2).
+ *
+ * What the card offers is computed, never hard-coded: `visibleOrderActions`
+ * and `jobActionsFor` are the same pure functions the server re-runs, so the
+ * ⋯ menu lists exactly the transitions the API would accept and shows the
+ * guard reason next to any it would refuse (Invariant 1, UI spec §6). The card
+ * itself never mutates anything — it reports the user's choice up through
+ * `onAction` / `onClaim` / `onVerify` and the dashboard opens the dialog.
+ *
+ * `data-order-id` is the hook that `use-restore-focus.ts` uses to return focus
+ * here after a sheet or dialog closes; there are two copies of every card (the
+ * mobile and desktop trees), and `visibleElement` picks the one on screen.
+ */
 export function OrderCard({
   order,
   persona,
@@ -57,8 +91,17 @@ export function OrderCard({
   // disabled-but-listed action still reads as actionable (DESIGN.md "Order card").
   const inert = actions.length === 0 && !jobActions.canClaim && !jobActions.canVerify && !jobActions.canComplete;
 
+  // The card has room for one progress bar, so it shows the first in-flight
+  // asset (the sheet's UploadPanel lists them all). On other tabs the bar moves
+  // from the server's `progressPct`, which arrives via SSE (pipeline 3, step 4).
   const uploading = order.assets.find((a) => a.status === 'UPLOADING');
+  // The job row (chip + Claim) belongs to the marketplace half of the board
+  // only. The InstallJob is upserted when the order reaches READY_FOR_INSTALL
+  // and outlives the order's completion, so gate on the order's status rather
+  // than on the job's existence.
   const showJob = order.installJob && (order.status === 'READY_FOR_INSTALL' || order.status === 'COMPLETED');
+  // A completed order has no meaningful due date left; `updatedAt` is when the
+  // COMPLETED transition landed, which is what the installer wants to see.
   const dateLine =
     order.status === 'COMPLETED' ? `Done ${formatDue(order.updatedAt)}` : `Due ${formatDue(order.dueDate)}`;
 

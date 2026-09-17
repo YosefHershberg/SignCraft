@@ -1,5 +1,7 @@
 'use client';
 
+// Pipeline 2 (claim race): the small mm:ss readout used wherever a claim's
+// TTL needs to show inline (job chip, claim button tooltip, job panel).
 import type { CSSProperties } from 'react';
 import { formatCountdown } from '@/lib/domain/format';
 import { cn } from '@/lib/utils';

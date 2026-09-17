@@ -1,5 +1,11 @@
 'use client';
 
+// components/orders — the right-docked sheet for one order. It is a pure view
+// over the TanStack cache (`useOrder`) that composes the per-section
+// components below it and forwards every action to the dashboard, which owns
+// the dialogs. All three pipelines are visible from here: the action bar
+// (transitions), `JobPanel` (claims) and `UploadPanel` (uploads).
+
 import { useCallback, useEffect, useRef } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { JobPanel } from '@/components/jobs/job-panel';
@@ -34,6 +40,22 @@ export interface OrderDetailSheetProps {
  *
  * The order is looked up by id on every render rather than captured as a prop,
  * so realtime updates and persona switches both re-render in place (§7.8).
+ *
+ * Section order, top to bottom, follows design 1c:
+ * 1. `SheetHeader` — order number, `StatusBadge`, title, customer.
+ * 2. `OrderActions` — transition buttons (pipeline 1).
+ * 3. `JobPanel` — Claim / Verify / Complete for installers (pipeline 2);
+ *    Complete is routed back through `onAction` because it is an order
+ *    transition, not a job write.
+ * 4. `DetailsGrid` — static facts.
+ * 5. `UploadPanel` — assets and the upload controls (pipeline 3).
+ * 6. `HistoryTimeline` — the embedded transition history.
+ *
+ * Two derived values drive the lifecycle. `missing` is "open, has an id, but
+ * the cache no longer holds that order" and closes the sheet via an effect.
+ * `lastShown` is the last non-null order, used *only* while `open` is false so
+ * Radix has something to render during the slide-out; while open, `live` is
+ * the sole source, so nothing stale can appear.
  */
 export function OrderDetailSheet({
   orderId,

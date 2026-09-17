@@ -1,5 +1,8 @@
 'use client';
 
+// Pipeline 2 (claim race): the confirm step before `useClaim()` fires the one
+// conditional `updateMany` (`claimJob` in lib/services/jobs.ts) that decides
+// the winner.
 import { useCallback, useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -61,6 +64,7 @@ export function ClaimDialog({
   const { canClaim } = jobActionsFor(persona, job, new Date(now));
   const taken = pub.status !== 'OPEN';
 
+  /** Fires the claim. On success, hands off to `onClaimed` (which opens `VerificationDialog`); on failure — most notably a 409 — surfaces the error inline rather than closing, since `useClaim`'s `onError` has already invalidated the bootstrap so the chip below re-renders as the winner's live countdown. */
   function confirm() {
     setError(null);
     claim.mutate(

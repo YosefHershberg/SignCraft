@@ -1,5 +1,8 @@
 'use client';
 
+// Pipeline 3 (direct-to-cloud upload), entry point on the UI side: the
+// detail sheet's Assets section, from which "Upload file"/"Simulate large
+// file" call into `useUploads().start()`.
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AssetRow } from '@/components/uploads/asset-row';
@@ -44,6 +47,7 @@ export function UploadPanel({ order, persona }: { order: OrderDTO; persona: Pers
     }
   }
 
+  /** The hidden file `<input>`'s change handler, invoked after the user picks a file from `fileInput.current?.click()`. */
   function onPick(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     // Reset first, so picking the same file twice in a row still fires change.
@@ -51,6 +55,7 @@ export function UploadPanel({ order, persona }: { order: OrderDTO; persona: Pers
     if (file) void run(() => start({ orderId: order.id, file }));
   }
 
+  /** Handles the row's Retry button — delegates to `useUploads().retry`, which re-uploads under a new asset id (§7.6). */
   async function onRetry(asset: AssetDTO) {
     // No File left to re-send (a reload dropped it): ask for it again rather
     // than leaving Retry inert.

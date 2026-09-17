@@ -2,6 +2,13 @@
 // snapshot TanStack Query holds. No fetch, no React — just data in, data out.
 import type { AssetDTO, BootstrapDTO, JobDTO, OrderDTO, Persona, SseEvent } from '@/lib/domain/types';
 
+/**
+ * Structural equality used purely to short-circuit cache writes. An SSE frame
+ * for a doc this tab just wrote itself (via a mutation's `onSuccess`) often
+ * carries a value already identical to what is cached; without this check
+ * `setQueryData` would still return a new object identity and re-render every
+ * subscriber for a no-op update.
+ */
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null || a === undefined || b === undefined) return false;
@@ -20,6 +27,15 @@ function deepEqual(a: unknown, b: unknown): boolean {
   );
 }
 
+/**
+ * Merges one `order.created`/`order.updated` frame into the bootstrap cache.
+ * Version-guarded — an older doc than the one already cached is dropped, so a
+ * frame from a resync or a race with a mutation response can never roll a
+ * card backwards. A change-stream `Order` document carries no relations, so
+ * the incoming `doc` is patched over the cached `installJob`/`assets` rather
+ * than replacing the whole order (those only ever move via `applyJobEvent`/
+ * `applyAssetEvent`, which target them directly).
+ */
 function applyOrderEvent(
   data: BootstrapDTO,
   ev: { type: 'order.created' | 'order.updated'; doc: OrderDTO }
@@ -43,6 +59,13 @@ function applyOrderEvent(
   return { ...data, orders };
 }
 
+/**
+ * Merges one `job.created`/`job.updated` frame — a claim, a verify, or a
+ * lazy-expiry flip — onto the order it belongs to. Version-guarded like
+ * `applyOrderEvent`, so a stale frame can never overwrite a newer claim state
+ * (pipeline 2, the claim race: exactly one `claimJob` write should ever win,
+ * and the losing tab's SSE frame must not be allowed to look like it did).
+ */
 function applyJobEvent(data: BootstrapDTO, ev: { type: 'job.created' | 'job.updated'; doc: JobDTO }): BootstrapDTO {
   const { doc } = ev;
   const idx = data.orders.findIndex((o) => o.id === doc.orderId);
@@ -57,6 +80,13 @@ function applyJobEvent(data: BootstrapDTO, ev: { type: 'job.created' | 'job.upda
   return { ...data, orders };
 }
 
+/**
+ * Merges one `asset.created`/`asset.updated` frame — a new upload row or a
+ * progress/status change — into its order's `assets` array. This is how
+ * other tabs' `UploadProgressBar`/`AssetRow` move during pipeline 3 without
+ * polling (Invariant 4): the uploading tab's `progress`/`complete` calls land
+ * here via the change stream exactly like any other write.
+ */
 function applyAssetEvent(
   data: BootstrapDTO,
   ev: { type: 'asset.created' | 'asset.updated'; doc: AssetDTO }
@@ -82,6 +112,13 @@ function applyAssetEvent(
   return { ...data, orders };
 }
 
+/**
+ * The one cache reducer for the bootstrap snapshot. `use-realtime.ts` calls it
+ * for every SSE frame, and `lib/query/hooks.ts`'s mutation `onSuccess`
+ * handlers call it again with a synthetic event built from the REST response
+ * — so a card ends up in the same state whether this tab made the change or
+ * another tab's change arrived over the wire.
+ */
 export function applyEvent(data: BootstrapDTO, ev: SseEvent): BootstrapDTO {
   switch (ev.type) {
     case 'order.created':
@@ -98,6 +135,7 @@ export function applyEvent(data: BootstrapDTO, ev: SseEvent): BootstrapDTO {
   }
 }
 
+/** Whether a fresh `InstallJob` should toast this tab (UI spec §7.1): only installers care, and only about a brand-new job. */
 export function shouldToastNewJob(ev: SseEvent, persona: Persona): boolean {
   return persona.kind === 'installer' && ev.type === 'job.created';
 }

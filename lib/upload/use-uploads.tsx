@@ -1,5 +1,9 @@
 'use client';
 
+// Pipeline 3 (direct-to-cloud upload), step 1 and the state that spans the
+// whole thing: owns every running `MultipartUploader`, wires it to the
+// `lib/query` mutations/cache, and exposes `start`/`abort`/`retry` to
+// `UploadPanel`/`AssetRow`.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SIMULATED_SIZES } from '@/lib/domain/constants';
@@ -25,6 +29,7 @@ export interface StartOptions {
   simulatedBytes?: number;
 }
 
+/** The context `useUploads()` returns: the three actions a component drives an upload with, plus every asset's live local progress keyed by asset id. */
 interface UploadsValue {
   /** Resolves when the upload is fully done; rejects with the failure. */
   start(opts: StartOptions): Promise<void>;
@@ -45,6 +50,7 @@ const UploadsContext = createContext<UploadsValue | null>(null);
  */
 const UI_INTERVAL_MS = 120;
 
+/** A plausible file name for a simulated upload of `bytes`, so the row looks like a real asset instead of a bare byte count. */
 function simulatedFileName(bytes: number): string {
   const known = SIMULATED_SIZES.find((size) => size.bytes === bytes);
   return `simulated-${(known?.label ?? formatBytes(bytes)).replace(/\s+/g, '').toLowerCase()}.bin`;
@@ -232,6 +238,7 @@ export function UploadsProvider({ children }: { children: ReactNode }) {
   return <UploadsContext.Provider value={value}>{children}</UploadsContext.Provider>;
 }
 
+/** Reads the shared upload state from context; throws outside `UploadsProvider` so a missing provider fails loudly rather than silently no-op-ing uploads. */
 export function useUploads(): UploadsValue {
   const ctx = useContext(UploadsContext);
   if (!ctx) throw new Error('useUploads must be used within an UploadsProvider');

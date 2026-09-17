@@ -1,5 +1,10 @@
 'use client';
 
+// components/layout — the sticky top bar. Hosts the three header widgets
+// (summary pills, connection indicator, persona switcher) and the desktop
+// "New order" button; the mobile FAB for the same action lives in
+// `components/dashboard.tsx`.
+
 import { Button } from '@/components/ui/button';
 import type { BootstrapDTO } from '@/lib/domain/types';
 import type { ConnectionStatus } from '@/lib/realtime/use-realtime';
@@ -8,14 +13,28 @@ import { ConnectionIndicator } from './connection-indicator';
 import { PersonaSwitcher } from './persona-switcher';
 import { StatusSummaryPills } from './status-summary-pills';
 
-/** Sticky 56px header (UI spec §4.1 / DESIGN.md "Header"). */
+/**
+ * Sticky 56px header (UI spec §4.1 / DESIGN.md "Header").
+ *
+ * The `PersonaSwitcher` here is what makes the two-tab QA recipe work: the
+ * `sc_persona` cookie only seeds a tab's first render, after which each tab
+ * holds its persona in React state (`lib/persona/persona-context.tsx`), so two
+ * windows can be Dana K. and Omar S. at the same time and race for a claim.
+ * The header is also why the detail sheet is non-modal — UI spec §7.8 needs
+ * this switcher clickable with the sheet open.
+ *
+ * `data` is the live bootstrap (not the server-rendered snapshot) so the
+ * pills and the switcher's vendor/installer lists track the cache.
+ */
 export function AppHeader({
   data,
   connectionStatus,
   onNewOrder,
 }: {
   data: BootstrapDTO;
+  /** From `useRealtime()` in the dashboard; the only place the SSE state is shown. */
   connectionStatus: ConnectionStatus;
+  /** Opens `CreateOrderDialog`; the button only renders for ops, matching the API's `POST /api/orders` rule. */
   onNewOrder: () => void;
 }) {
   const { persona } = usePersona();

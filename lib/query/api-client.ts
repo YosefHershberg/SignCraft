@@ -1,3 +1,7 @@
+// Client-side query layer: the one fetch wrapper every `lib/query/hooks.ts`
+// query and mutation goes through. Turns the server's `{ error }` envelope
+// into a typed `ApiClientError` so callers can branch on `status`/`code`
+// (e.g. `invalidateOn409`) instead of parsing responses themselves.
 import type { Persona } from '@/lib/domain/types';
 import { serialisePersona } from '@/lib/domain/personas';
 
@@ -16,12 +20,14 @@ export class ApiClientError extends Error {
   }
 }
 
+/** `api()`'s request options; `persona` is required so no call can forget the `x-persona` header the server needs to authorise it. */
 interface ApiInit {
   method?: string;
   body?: unknown;
   persona: Persona;
 }
 
+/** The shape of a non-2xx JSON body, mirroring `lib/api/errors.ts`'s wire format. */
 interface ErrorEnvelope {
   error?: { code?: string; message?: string; details?: Record<string, unknown> };
 }

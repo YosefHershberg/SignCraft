@@ -1,5 +1,7 @@
 'use client';
 
+// Pipeline 3 (direct-to-cloud upload): renders one asset in `UploadPanel`'s
+// list, reconciling this tab's live local progress with the server's DTO.
 import { Check, X } from 'lucide-react';
 import { UploadProgressBar } from '@/components/uploads/upload-progress-bar';
 import { formatBytes, formatCountdown } from '@/lib/domain/format';
@@ -7,6 +9,7 @@ import type { AssetDTO, AssetStatus } from '@/lib/domain/types';
 import type { LocalProgress } from '@/lib/upload/use-uploads';
 import { cn } from '@/lib/utils';
 
+/** Status pill colours/labels, one per `AssetStatus` (DESIGN.md status hues). */
 const BADGE: Record<AssetStatus, { label: string; bg: string; fg: string }> = {
   PENDING: { label: 'Pending', bg: '#F1F5F9', fg: '#475569' },
   UPLOADING: { label: 'Uploading', bg: '#CCFBF1', fg: '#0F766E' },

@@ -1,5 +1,10 @@
 'use client';
 
+// components/board — one status column of the desktop/tablet board. Given the
+// already-filtered orders for its status by `KanbanBoard`, it renders the
+// heading, count and a card per order, spreading the shared `CardBinding`
+// into every `OrderCard`.
+
 import { STATUS_META } from '@/lib/domain/status-meta';
 import type { OrderDTO, OrderStatus } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
@@ -15,10 +20,13 @@ export type CardBinding = Pick<
 
 export interface StatusColumnProps {
   status: OrderStatus;
+  /** Only the persona-visible orders already in this status; the column never filters. */
   orders: OrderDTO[];
   vendorNames: Record<string, string>;
+  /** Per-card props that are identical across the whole board (see `CardBinding`). */
   card: CardBinding;
   onOpenOrder: (orderId: string) => void;
+  /** See `KanbanBoardProps.highlightIds`. */
   highlightIds?: ReadonlySet<string>;
   selectedOrderId?: string | null;
   /** Overrides the status label, e.g. "Ready for install · marketplace". */
@@ -29,6 +37,20 @@ export interface StatusColumnProps {
   loading?: boolean;
 }
 
+/**
+ * A single board column (UI spec §4.2). Two layouts share the same markup:
+ *
+ * - `stack` — the default 280px column (auto-width from xl) with cards in a
+ *   vertical list; what ops and vendors see for all seven statuses.
+ * - `grid` — the installer marketplace (design 1b). An installer has only two
+ *   columns, so each takes the full width and lays cards out in up to three
+ *   grid columns; the empty placeholder spans the grid so it is not squeezed
+ *   into one cell.
+ *
+ * The card key includes `order.status` on purpose: when an SSE frame moves an
+ * order between columns the card remounts and replays its entrance animation
+ * in the new column rather than being reconciled in place.
+ */
 export function StatusColumn({
   status,
   orders,

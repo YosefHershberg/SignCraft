@@ -1,5 +1,8 @@
 'use client';
 
+// Pipeline 2 (claim race): the installer's Claim affordance, shared by the
+// board card and `JobPanel`. Opens `ClaimDialog` on click; never performs the
+// claim itself.
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toPublicJob } from '@/lib/domain/claims';

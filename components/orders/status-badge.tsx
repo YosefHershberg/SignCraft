@@ -1,3 +1,7 @@
+// components/orders — the one status pill. Colours come from `STATUS_META`
+// (`lib/domain/status-meta.ts`), the same table that colours card stripes,
+// column dots and the timeline, so a status looks identical everywhere.
+
 import { STATUS_META } from '@/lib/domain/status-meta';
 import type { OrderStatus } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
