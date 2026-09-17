@@ -1,3 +1,18 @@
+/**
+ * prisma/seed.ts — `pnpm db:seed`, a ONE-TIME demo fixture (CLAUDE.md): 3
+ * vendors, 4 installers, 8 orders spanning every status with a realistic
+ * history chain, run via `pnpm prisma db seed` or directly with tsx.
+ *
+ * Idempotent by `orderNumber`: `seed()` skips any order whose number already
+ * exists, so re-running it only fills in gaps (e.g. after adding a vendor to
+ * `VENDORS`) — it never restores an order that a reviewer has since moved
+ * through the board, and it must not be used to "reset" the demo (there is
+ * no separate reset path).
+ *
+ * SC-0002 (a DRAFT order) additionally gets an UPLOADED asset so Submit is
+ * demonstrable the moment a reviewer opens the app, without first having to
+ * run an upload through pipeline 3 themselves.
+ */
 import { PrismaClient, type OrderStatus, type SignType } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -36,6 +51,14 @@ const ORDERS: SeedOrder[] = [
 
 const CHAIN: OrderStatus[] = ['DRAFT', 'SUBMITTED', 'VENDOR_ACCEPTED', 'IN_PRODUCTION', 'READY_FOR_INSTALL', 'COMPLETED'];
 
+/**
+ * Upserts the vendor/installer rosters, then creates each order from
+ * `ORDERS` (skipping any `orderNumber` already in the DB) with a history
+ * chain built up to its target status — CANCELLED orders walk the chain to
+ * `cancelledFrom` and append one more CANCELLED entry — plus a seed asset
+ * and install job where the status implies one, and finally backfills the
+ * SC-0002 upload described above.
+ */
 export async function seed() {
   const vendors = new Map<string, string>();
   for (const name of VENDORS) {

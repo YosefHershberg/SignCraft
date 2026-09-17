@@ -1,5 +1,16 @@
+/**
+ * Presentation metadata keyed by enum: labels, the status hues from
+ * `docs/design/DESIGN.md`, and the copy the transition dialog shows. Kept in
+ * `lib/domain` so every surface (badge, column header, card stripe, pills,
+ * dialogs) renders one status the same way.
+ */
 import type { OrderAction, OrderStatus, SignType } from './types';
 
+/**
+ * Per-status label and colours. `dot`/`bg`/`fg` are the literal hex values
+ * for inline styles; `cssVar` is the matching token from `globals.css` for
+ * Tailwind-driven surfaces.
+ */
 export const STATUS_META: Record<
   OrderStatus,
   { label: string; short: string; dot: string; bg: string; fg: string; cssVar: string }
@@ -63,6 +74,7 @@ export const SIGN_TYPE_LABEL: Record<SignType, string> = {
   MONUMENT: 'Monument',
 };
 
+/** Button text per order action (action bar, card ⋯ menu, dialog confirm button). */
 export const ACTION_LABEL: Record<OrderAction, string> = {
   submit: 'Submit',
   accept: 'Accept',
@@ -72,6 +84,7 @@ export const ACTION_LABEL: Record<OrderAction, string> = {
   cancel: 'Cancel',
 };
 
+/** The one-line "what happens next" the transition confirm dialog shows under the title (UI spec §4.6). */
 export const ACTION_CONSEQUENCE: Record<OrderAction, string> = {
   submit: 'The vendor will be notified',
   accept: 'Production can start',

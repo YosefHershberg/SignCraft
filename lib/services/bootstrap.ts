@@ -1,3 +1,4 @@
+/** lib/services/bootstrap.ts — assembles `GET /api/bootstrap`'s single response, the dashboard's first-render snapshot. */
 import { prisma } from '@/lib/db/prisma';
 import { claimTtlMs } from '@/lib/domain/claims';
 import type { BootstrapDTO } from '@/lib/domain/types';

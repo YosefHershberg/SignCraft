@@ -1,9 +1,17 @@
+/**
+ * app/page.tsx — the server entry point. Fetches the bootstrap snapshot and
+ * resolves the incoming `sc_persona` cookie against it, then hands both to
+ * `<Dashboard>` as the client's starting state; from there the client owns
+ * persona (React state, `PersonaProvider`) and data (TanStack Query, seeded
+ * with this same snapshot) refresh.
+ */
 import { cookies } from 'next/headers';
 import { getBootstrap } from '@/lib/services/bootstrap';
 import { parsePersona, resolvePersona } from '@/lib/domain/personas';
 import { Dashboard } from '@/components/dashboard';
 import { PERSONA_COOKIE } from '@/lib/persona/cookie';
 
+/** Never cached: every render needs the current board and a persona check against the current roster. */
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {

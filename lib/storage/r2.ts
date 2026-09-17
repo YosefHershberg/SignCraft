@@ -1,3 +1,10 @@
+/**
+ * lib/storage/r2.ts — pipeline 3's only R2-facing code. Wraps the AWS S3 SDK
+ * (R2 is S3-compatible) for multipart create/presign/complete/abort. Bytes
+ * never reach these calls (Invariant 5): `lib/services/assets.ts` calls in
+ * with metadata only, and the actual PUTs go browser → the presigned URLs
+ * this returns.
+ */
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
@@ -10,6 +17,11 @@ import { ApiError } from '@/lib/api/errors';
 import { PRESIGN_EXPIRY_S } from '@/lib/domain/constants';
 import { sanitiseFileName } from '@/lib/domain/format';
 
+/**
+ * The upload operations `lib/services/assets.ts` needs, kept narrow so
+ * integration tests can substitute a mock implementation instead of hitting
+ * real R2.
+ */
 export interface Storage {
   createMultipart(key: string, contentType: string): Promise<{ uploadId: string }>;
   presignPart(key: string, uploadId: string, partNumber: number): Promise<string>;
@@ -19,8 +31,12 @@ export interface Storage {
 
 let client: S3Client | undefined;
 
-// Env is read lazily here (not at module load) so importing this module
-// without R2 env vars set (e.g. from an unrelated unit test) never throws.
+/**
+ * Lazily builds (and caches) the S3 client against the R2 endpoint. Env is
+ * read here, not at module load, so importing this module without R2 env
+ * vars set — as any unit test that pulls in `lib/services/assets.ts` does —
+ * never throws; the failure only happens if a call is actually made.
+ */
 function getClient(): S3Client {
   if (client) return client;
   client = new S3Client({
@@ -39,6 +55,13 @@ function bucket(): string {
   return process.env.R2_BUCKET ?? '';
 }
 
+/**
+ * The live `Storage` implementation. Every method wraps its R2 call in
+ * try/catch and rethrows as `ApiError(502, 'STORAGE_ERROR', { op })` — the
+ * one error shape `lib/services/assets.ts` and the route handlers need to
+ * handle, regardless of which AWS SDK error actually occurred. `op` names
+ * which call failed, for logs and the client's error toast.
+ */
 export const storage: Storage = {
   async createMultipart(key, contentType) {
     try {
@@ -94,6 +117,7 @@ export const storage: Storage = {
   },
 };
 
+/** The R2 object key for an asset: `orders/<orderId>/<assetId>/<sanitised name>` — needs the asset id, so `createAsset` computes it only after the row is inserted. */
 export function storageKeyFor(orderId: string, assetId: string, fileName: string): string {
   return `orders/${orderId}/${assetId}/${sanitiseFileName(fileName)}`;
 }

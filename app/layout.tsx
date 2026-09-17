@@ -1,3 +1,4 @@
+/** app/layout.tsx — root HTML shell: fonts, base theme classes, and the toast host every mutation's success/error surfaces through. */
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';

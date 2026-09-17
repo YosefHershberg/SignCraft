@@ -1,3 +1,10 @@
+/**
+ * lib/board/visibility.ts — per-persona board layout. Pure functions the
+ * client uses to decide which orders show and how columns render; this is
+ * the client-side confidentiality boundary noted in CLAUDE.md (a spoofable
+ * `x-persona` header can't be one, so a vendor's own-orders filter lives
+ * here, not on the server).
+ */
 import { ORDER_STATUSES, type OrderDTO, type OrderStatus, type Persona } from '@/lib/domain/types';
 
 /** Statuses an installer can act on; everything else collapses to a rail (UI spec §4.2). */

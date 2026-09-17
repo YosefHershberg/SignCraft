@@ -1,3 +1,9 @@
+/**
+ * Install-job service (graded behaviour #2): the claim race, verification,
+ * the expiry sweep and job reads. Every write here is a single conditional
+ * `updateMany` whose filter *is* the lock (ADR-005, architecture §9); every
+ * read leaves through `toJobDTO` so lazy expiry is applied (Invariant 3).
+ */
 import { prisma } from '@/lib/db/prisma';
 import { claimTtlMs } from '@/lib/domain/claims';
 import type { JobDTO } from '@/lib/domain/types';
@@ -9,6 +15,13 @@ import { toJobDTO } from './dto';
  * This is ONE conditional updateMany whose filter is `OPEN OR (CLAIMED AND expired)`;
  * MongoDB serialises concurrent writers on the single document, so exactly one
  * concurrent caller ever sees `count === 1`. No read-then-write, no transaction.
+ *
+ * Invariant 2 — do not restructure. The `expired` arm of the filter is what
+ * lets a new claimant take over a lapsed claim without any sweep having run.
+ * `count !== 1` is ambiguous (taken vs. no such job), so one follow-up read
+ * disambiguates; the read plays no part in the lock.
+ *
+ * @throws ApiError 409 CLAIM_TAKEN when another installer holds a live claim (or the job is ASSIGNED); 404 NOT_FOUND when the job does not exist.
  */
 export async function claimJob(jobId: string, installerId: string, now: Date = new Date()): Promise<JobDTO> {
   const expiresAt = new Date(now.getTime() + claimTtlMs({ CLAIM_TTL_MS: process.env.CLAIM_TTL_MS }));
@@ -35,9 +48,15 @@ export async function claimJob(jobId: string, installerId: string, now: Date = n
 }
 
 /**
- * Verifies a claimed job's install outcome. `pass` assigns the installer;
- * `fail` reopens the job. Only the current claimant may verify, and only
- * before the claim expires.
+ * Verifies a claimed job's install outcome (ADR-010). `pass` assigns the
+ * installer (order Complete then checks `canCompleteOrder` against this);
+ * `fail` reopens the job for another installer. Same single-`updateMany`
+ * shape as `claimJob`: the filter (`CLAIMED`, this installer, not yet
+ * expired) is the only check, so a stale or hijacked verify cannot succeed.
+ *
+ * @throws {ApiError} 404 if the job does not exist, 409 CLAIM_EXPIRED if the
+ * hold lapsed before this call landed, 409 NOT_CLAIMANT if `installerId`
+ * does not hold the current claim.
  */
 export async function verifyJob(
   jobId: string,

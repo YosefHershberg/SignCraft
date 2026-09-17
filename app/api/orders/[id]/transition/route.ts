@@ -8,6 +8,13 @@ import { transitionOrder } from '@/lib/services/orders';
 
 export const runtime = 'nodejs';
 
+/**
+ * POST /api/orders/:id/transition — pipeline 1's single write. Persona: any
+ * (rules vary per edge, enforced by `checkTransition`). Body: `{to,
+ * expectedVersion?, reason?}`. 200 `OrderDTO`. Errors: 400
+ * INVALID_TRANSITION `{from,to,allowed}` / GUARD_FAILED `{reason}`, 403, 404,
+ * 409 VERSION_CONFLICT.
+ */
 export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const id = await parseId(params);
   const persona = requirePersona(req);

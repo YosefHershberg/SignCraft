@@ -1,3 +1,8 @@
+/**
+ * Copy for the order history timeline (`components/orders/history-timeline.tsx`):
+ * turns a `TransitionDTO` (an enum pair plus actor ids) into a sentence.
+ * Pure; the bootstrap rosters are passed in for name lookup.
+ */
 import type { InstallerDTO, OrderStatus, TransitionDTO, VendorDTO } from './types';
 
 /**

@@ -23,6 +23,14 @@ async function parseAbortBody(req: Request): Promise<AbortInput> {
   }
 }
 
+/**
+ * POST /api/assets/:id/abort — pipeline 3, step 6: abandons the R2 multipart
+ * (best-effort) and marks the asset terminal. Persona: ops. Body: optional
+ * `{reason?: 'user'|'error'}` (empty body = `'user'`); `'error'` leaves the
+ * asset FAILED (offers Retry), `'user'` leaves it ABORTED. 204 (idempotent —
+ * a no-op once the asset is already terminal). Errors: 400 (malformed
+ * JSON), 403, 404.
+ */
 export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const id = await parseId(params);
   requireKind(req, 'ops');
