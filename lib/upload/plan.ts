@@ -1,11 +1,17 @@
+// Pipeline 3 (direct-to-cloud upload), step 2: the pure arithmetic of
+// splitting a file into presigned-multipart parts, plus the throttling that
+// bounds how often progress is written to the server. No fetch, no DOM —
+// consumed by both `part-source.ts` and `uploader.ts`.
 import { PART_SIZE, PROGRESS_INTERVAL_MS, PROGRESS_STEP_PCT } from '@/lib/domain/constants';
 
+/** How one upload is chopped up: `partSize` per part except the last, which is `lastPartSize`; `partCount` total. */
 export interface UploadPlan {
   partSize: number;
   partCount: number;
   lastPartSize: number;
 }
 
+/** Derives an `UploadPlan` for a file of `sizeBytes`, matching the plan `createAsset` returns from `POST /api/assets` (`lib/services/assets.ts`) so client and server never disagree on part boundaries. */
 export function planParts(sizeBytes: number, partSize: number = PART_SIZE): UploadPlan {
   // A zero-byte file still needs one (empty) part to upload/complete.
   const partCount = Math.max(1, Math.ceil(sizeBytes / partSize));
@@ -13,6 +19,7 @@ export function planParts(sizeBytes: number, partSize: number = PART_SIZE): Uplo
   return { partSize, partCount, lastPartSize };
 }
 
+/** The byte range (`[start, end)`) and size of one part under `plan`. Used both to slice/allocate the part body and to compute how many bytes a completed part contributed. */
 export function partRange(plan: UploadPlan, partNumber: number): { start: number; end: number; size: number } {
   const start = (partNumber - 1) * plan.partSize;
   const size = partNumber === plan.partCount ? plan.lastPartSize : plan.partSize;
@@ -43,6 +50,15 @@ export function estimate(
   return { bytesPerSecond, etaMs: (remaining / bytesPerSecond) * 1000 };
 }
 
+/**
+ * Whether `MultipartUploader.reportProgress` should send `POST
+ * /api/assets/:id/progress` right now, given the last report it sent
+ * (`prev`). Fires on whichever comes first: `PROGRESS_INTERVAL_MS` elapsed,
+ * `PROGRESS_STEP_PCT` more progress, or completion (`pct === 100`, always
+ * reported so the row never stalls just under 100%). This is the only
+ * throttle between an upload and the database, and it is what keeps a single
+ * upload to roughly 20-30 writes regardless of file size or part count.
+ */
 export function shouldReportProgress(prev: { at: number; pct: number }, now: number, pct: number): boolean {
   return now - prev.at >= PROGRESS_INTERVAL_MS || pct - prev.pct >= PROGRESS_STEP_PCT || pct === 100;
 }

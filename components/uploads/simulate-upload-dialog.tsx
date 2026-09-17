@@ -1,5 +1,8 @@
 'use client';
 
+// Pipeline 3 (direct-to-cloud upload): the size-picker that kicks off a
+// simulated upload (no real File; `simulatedSource` in lib/upload/part-source.ts
+// generates the bytes) through the same pipeline as a real one.
 import { useEffect, useState } from 'react';
 import {
   Dialog,
@@ -27,6 +30,12 @@ const NOMINAL_BYTES_PER_SECOND = 28 * 1024 * 1024;
 /** 1 GB is the size the demo script uses, so it is the one pre-selected. */
 const DEFAULT_BYTES = SIMULATED_SIZES[1].bytes;
 
+/**
+ * "Simulate large file" step of the upload flow (design screen 1f). Purely a
+ * size picker — pressing Start hands `onStart(bytes)` back to `UploadPanel`,
+ * which calls `useUploads().start({ simulatedBytes: bytes })` to run the same
+ * `MultipartUploader` a real file would use.
+ */
 export function SimulateUploadDialog({
   open,
   onOpenChange,

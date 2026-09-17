@@ -4,8 +4,15 @@
 import { changeToEvent, formatSse, type ChangeLike } from './events';
 import { SSE_HEARTBEAT_MS, SSE_MAX_AGE_MS } from '@/lib/domain/constants';
 
+/** What `db.watch(...)` gives the route handler: an async-iterable of change docs plus an explicit close, so this module never has to know it's Mongo. */
 export type WatchCursor = AsyncIterable<ChangeLike> & { close(): Promise<void> };
 
+/**
+ * Everything `createSseStream` needs from the outside world, injected so unit
+ * tests can drive the state machine with a fake `watch`/`now` instead of a
+ * real Atlas connection. `app/api/events/route.ts` supplies the real `watch`
+ * (wrapping `db.watch(...)` from `lib/db/mongo.ts`) and `now` (`Date.now`).
+ */
 export interface SseDeps {
   watch: (resumeToken: string | null) => WatchCursor;
   now: () => Date;
@@ -32,6 +39,27 @@ function isResumeError(err: unknown): boolean {
   return typeof e.message === 'string' && e.message.toLowerCase().includes('resume');
 }
 
+/**
+ * Turns a change-stream watch into the `GET /api/events` response body
+ * (architecture spec §10). Lifecycle, in order:
+ *
+ * - `: connected` immediately, so the client's `EventSource` fires `onopen`.
+ * - `: hb` every `heartbeatMs` (default `SSE_HEARTBEAT_MS`) — a comment line,
+ *   invisible to `EventSource` listeners, that exists purely so intermediary
+ *   proxies don't time out an apparently-idle connection.
+ * - `event: reconnect` at `maxAgeMs` (default `SSE_MAX_AGE_MS`, chosen to sit
+ *   inside Vercel's 300 s function ceiling) followed by a clean `cleanup()` —
+ *   the client closes this EventSource and reopens with `?after=<lastId>`
+ *   rather than being cut off mid-stream by the platform.
+ * - `event: resync` when the change stream throws a resumable error
+ *   (`isResumeError`: token invalidated or history lost) — the cursor is
+ *   recreated from scratch (`resumeToken: null`) up to `MAX_RESYNCS` times
+ *   before the stream gives up and errors, so the client falls back to a
+ *   plain bootstrap refetch instead of missing writes silently.
+ * - `cleanup()` is idempotent and shared by abort, max-age, a fatal error and
+ *   the stream's own `cancel()`, so every exit path stops the timers and
+ *   closes the live cursor exactly once.
+ */
 export function createSseStream(
   deps: SseDeps,
   resumeToken: string | null,

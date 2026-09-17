@@ -1,5 +1,8 @@
 'use client';
 
+// Dashboard shell: the top of the client component tree. Wraps the board in
+// `Providers`, drives `useBootstrap`/`useRealtime` (pipeline 1/2/3's shared
+// client entry point), and owns which overlay (sheet or dialog) is open.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { KanbanBoard } from '@/components/board/kanban-board';
@@ -35,6 +38,15 @@ export function Dashboard({ initialData, initialPersona }: { initialData: Bootst
   );
 }
 
+/**
+ * The board itself: subscribes to the bootstrap cache and the SSE connection,
+ * and owns which overlay is open. Overlay state (`selectedOrderId`,
+ * `claimOrderId`, `verifyOrderId`, ...) is kept as an order id rather than a
+ * captured `OrderDTO`/`JobDTO`, so an SSE frame that changes that order while
+ * a dialog is open re-renders the dialog against live data instead of a
+ * stale snapshot taken when it opened (`DashboardDialogs` re-derives the DTO
+ * from `board` on every render).
+ */
 function DashboardBoard({ initialData }: { initialData: BootstrapDTO }) {
   const { data } = useBootstrap(initialData);
   const connectionStatus = useRealtime();

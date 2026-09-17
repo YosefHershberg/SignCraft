@@ -1,5 +1,8 @@
 'use client';
 
+// Pipeline 2 (claim race) and lazy expiry: the compact job-state badge shown
+// on board cards; also the one place that detects a claim lapsing client-side
+// and reports it upward via `onExpire`.
 import { useEffect, useRef } from 'react';
 import { toPublicJob } from '@/lib/domain/claims';
 import type { InstallerDTO, JobDTO, Persona } from '@/lib/domain/types';

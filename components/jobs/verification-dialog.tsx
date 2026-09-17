@@ -1,5 +1,7 @@
 'use client';
 
+// Pipeline 2 (claim race): the verification step after a winning claim —
+// counts down the TTL and calls `useVerify()` (pass -> ASSIGNED, fail -> OPEN).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -63,6 +65,13 @@ export function VerificationDialog({
   const pub = toPublicJob(job, at);
   const mine = pub.status === 'CLAIMED' && persona.kind === 'installer' && pub.claim?.installerId === persona.id;
   const remaining = claimRemainingMs(pub, at);
+  // `view` is derived fresh every render, never stored: `success` once this
+  // tab's own verify-pass response set `assigned`; `expired` if the server
+  // said so (`CLAIM_EXPIRED`) or if the lazily-expired `pub` no longer shows
+  // this installer holding a live claim; `counting` otherwise. Recomputing it
+  // from `toPublicJob(job, now)` on every tick is what lets the dialog flip to
+  // `expired` on its own the instant the countdown reaches zero, with no timer
+  // of its own to fall out of sync with the server's rule.
   const view = assigned ? 'success' : expiredByServer || !mine || remaining <= 0 ? 'expired' : 'counting';
 
   // The close is scheduled from an effect but must not be re-armed by the
@@ -76,6 +85,7 @@ export function VerificationDialog({
     return () => clearTimeout(timer);
   }, [view]);
 
+  /** Submits the verify outcome. `pass` moves to the `success` view (job ASSIGNED); `fail` closes the dialog and toasts, since a deliberately failed job has nothing left to show here. A `CLAIM_EXPIRED` response is treated as the `expired` view rather than a generic error. */
   function submit(outcome: 'pass' | 'fail') {
     setError(null);
     verify.mutate(

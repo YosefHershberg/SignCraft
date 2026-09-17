@@ -1,5 +1,9 @@
 'use client';
 
+// Client-side query layer: TanStack Query hooks over the single bootstrap
+// snapshot (`keys.bootstrap`). Queries read it, mutations write through it via
+// `applyEvent` (the same reducer SSE frames use — see `lib/realtime/apply-event.ts`),
+// so REST responses and realtime frames converge on identical cache state.
 import { useSyncExternalStore } from 'react';
 import {
   skipToken,
@@ -31,6 +35,7 @@ import { keys } from './keys';
 // --- Cache patchers: reuse applyEvent with a synthetic event so a mutation
 // response updates the bootstrap cache exactly the way an SSE frame would. ---
 
+/** Patches an order mutation's response into the cache via `applyEvent`, inferring created-vs-updated from whether the id is already there. */
 export function setOrderInCache(qc: QueryClient, order: OrderDTO): void {
   qc.setQueryData<BootstrapDTO>(keys.bootstrap, (old) => {
     if (!old) return old;
@@ -39,16 +44,25 @@ export function setOrderInCache(qc: QueryClient, order: OrderDTO): void {
   });
 }
 
+/** Patches a claim/verify mutation's response into the cache via `applyEvent`. */
 export function setJobInCache(qc: QueryClient, job: JobDTO): void {
   qc.setQueryData<BootstrapDTO>(keys.bootstrap, (old) => (old ? applyEvent(old, { type: 'job.updated', doc: job }) : old));
 }
 
+/** Patches an asset mutation's response into the cache via `applyEvent`. */
 export function setAssetInCache(qc: QueryClient, asset: AssetDTO): void {
   qc.setQueryData<BootstrapDTO>(keys.bootstrap, (old) =>
     old ? applyEvent(old, { type: 'asset.updated', doc: asset }) : old
   );
 }
 
+/**
+ * On a 409 (stale `version`, claim already taken/expired), the mutation's own
+ * optimistic write can't be trusted — something else changed the doc between
+ * this tab's read and its write. Refetching the bootstrap is how the client
+ * behaviour in architecture spec §12 puts the true server state back in the
+ * cache instead of leaving the tab showing a request that didn't land.
+ */
 function invalidateOn409(qc: QueryClient, err: unknown): void {
   if (err instanceof ApiClientError && err.status === 409) {
     void qc.invalidateQueries({ queryKey: keys.bootstrap });
@@ -57,6 +71,15 @@ function invalidateOn409(qc: QueryClient, err: unknown): void {
 
 // --- Queries ---
 
+/**
+ * The one query behind the whole board (`GET /api/bootstrap`). `initialData`
+ * is the server-rendered snapshot from `app/page.tsx`, so the first paint
+ * needs no client fetch. `staleTime: Infinity` because SSE (`useRealtime`) is
+ * what keeps this fresh — a normal staleness policy would fight the realtime
+ * writes. `refetchInterval` only turns on at `DEGRADED_POLL_MS` while the
+ * connection status (read from `lib/realtime/use-realtime.ts`'s module-level
+ * store) is `degraded`; that is the sole polling path in the app (Invariant 4).
+ */
 export function useBootstrap(initialData: BootstrapDTO): UseQueryResult<BootstrapDTO> {
   const { persona } = usePersona();
   const status = useSyncExternalStore(subscribeConnectionStatus, getConnectionStatus, getConnectionStatus);
@@ -86,6 +109,7 @@ export function useOrder(orderId: string | null): OrderDTO | null {
 
 // --- Mutations ---
 
+/** `POST /api/orders` — ops persona only (enforced server-side; see `lib/domain/permissions.ts`). */
 export function useCreateOrder() {
   const qc = useQueryClient();
   const { persona } = usePersona();
@@ -96,6 +120,7 @@ export function useCreateOrder() {
   });
 }
 
+/** `POST /api/orders/:id/transition` — any persona, per-transition rules checked server-side (pipeline 1). Callers pass `expectedVersion` for optimistic-concurrency 409s. */
 export function useTransition() {
   const qc = useQueryClient();
   const { persona } = usePersona();
@@ -107,6 +132,7 @@ export function useTransition() {
   });
 }
 
+/** `POST /api/jobs/:id/claim` — installer persona only. A 409 means another installer's conditional update won the race first (pipeline 2). */
 export function useClaim() {
   const qc = useQueryClient();
   const { persona } = usePersona();
@@ -117,6 +143,7 @@ export function useClaim() {
   });
 }
 
+/** `POST /api/jobs/:id/verify` — installer persona, and only the claimant; a 409 is `CLAIM_EXPIRED` or `NOT_CLAIMANT`. */
 export function useVerify() {
   const qc = useQueryClient();
   const { persona } = usePersona();
@@ -139,6 +166,7 @@ export interface CreateAssetResult {
   partCount: number;
 }
 
+/** `POST /api/assets` — ops persona only. Pipeline 3 step 1: creates the `Asset` row and the R2 multipart upload, and returns the plan the uploader needs (`CreateAssetResult`). */
 export function useCreateAsset() {
   const qc = useQueryClient();
   const { persona } = usePersona();
@@ -154,6 +182,7 @@ export function useCreateAsset() {
 
 // --- Upload pipeline wire calls (Task 15) ---
 
+/** The shape `uploadWireApi()` returns — matches `UploaderApi` (`lib/upload/uploader.ts`) plus the `reason` an abort needs to distinguish user-cancelled from give-up-after-retries. */
 export interface UploadWireApi {
   presign(assetId: string, partNumbers: number[]): Promise<{ partNumber: number; url: string }[]>;
   progress(assetId: string, bytesUploaded: number): Promise<void>;

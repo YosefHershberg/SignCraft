@@ -1,5 +1,8 @@
+// Pipeline 3 (direct-to-cloud upload), step 2: turns a part number into the
+// bytes for that part. Consumed by `MultipartUploader` in `uploader.ts`.
 import { partRange, type UploadPlan } from '@/lib/upload/plan';
 
+/** A source of part bodies: given a 1-based part number, returns the `Blob` to PUT for it. Real uploads use `fileSource`, demo uploads use `simulatedSource`. */
 export type PartSource = (partNumber: number) => Blob;
 
 /** Slices the real File at each part's byte range. */

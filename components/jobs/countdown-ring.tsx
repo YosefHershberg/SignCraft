@@ -1,8 +1,11 @@
 'use client';
 
+// Pipeline 2 (claim race): the big countdown visual in `VerificationDialog`,
+// the concurrency demo's centrepiece.
 import { formatCountdown } from '@/lib/domain/format';
 import { ringColour, ringOffset } from '@/lib/domain/ring';
 
+/** Ring stroke width in px. */
 const STROKE = 8;
 /** Gap between the stroke and the box edge, so `stroke-linecap: round` is not clipped. */
 const INSET = 6;

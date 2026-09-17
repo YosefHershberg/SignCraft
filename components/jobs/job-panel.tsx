@@ -1,5 +1,7 @@
 'use client';
 
+// Pipeline 2 (claim race): the detail sheet's install-job section, and the
+// one place Claim/Verify/Complete live for an installer.
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { claimRemainingMs, toPublicJob } from '@/lib/domain/claims';
@@ -54,8 +56,10 @@ export function JobPanel({
   // Asked of the order, not the job: the job stays ASSIGNED once the order is
   // COMPLETED, so the job alone would keep offering a dead Complete button.
   const canComplete = canCompleteOrder(persona, order, at);
+  /** Looks up an installer's display name, falling back to a placeholder rather than showing nothing for a stale/removed id. */
   const nameOf = (id: string | null | undefined) =>
     (id ? installers.find((i) => i.id === id)?.name : undefined) ?? 'Unknown installer';
+  /** " (you)" when `id` is the viewing installer, so the claim/assignment line is unambiguous about whose it is. */
   const mine = (id: string | null | undefined) => (persona.kind === 'installer' && id === persona.id ? ' (you)' : '');
 
   const remaining = claimRemainingMs(pub, at);
