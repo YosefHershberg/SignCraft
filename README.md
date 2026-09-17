@@ -4,6 +4,8 @@ A single-page management dashboard for custom-signage orders: order lifecycle, i
 
 **Live deployment:** https://signcraft-blond.vercel.app
 
+[![CI](https://github.com/YosefHershberg/SignCraft/actions/workflows/ci.yml/badge.svg)](https://github.com/YosefHershberg/SignCraft/actions/workflows/ci.yml)
+
 A requirement-by-requirement walkthrough (what each rule means, where it lives, how to verify it) is in [`EXPLANATIONS.md`](EXPLANATIONS.md).
 
 ---
@@ -19,6 +21,7 @@ A requirement-by-requirement walkthrough (what each rule means, where it lives, 
 - [Code documentation](#code-documentation)
 - [Configuration](#configuration)
 - [Tests](#tests)
+- [CI/CD](#cicd)
 - [Trade-offs](#trade-offs)
 - [Manual QA checklist](#manual-qa-checklist)
 - [Repository layout](#repository-layout)
@@ -322,6 +325,58 @@ R2 is mocked in the suite, so nothing here proves an object reached the bucket. 
 
 Integration tests are deliberately serial (`fileParallelism: false`) with a 30 s timeout: every assertion is a real round trip to Atlas, and an M0 cluster takes roughly 2–3 s per write batch.
 
+## CI/CD
+
+GitHub Actions runs the checks; Vercel's GitHub integration does the deploying. The two start from the same push and run side by side (ADR-018).
+
+```
+ push to a PR branch ─┬─► GitHub Actions  verify ──► integration (signcraft_test)
+                      └─► Vercel          preview deployment, own URL, linked on the PR
+
+ push / merge to main ┬─► GitHub Actions  verify ──► integration (signcraft_test)
+                      └─► Vercel          production build ──► https://signcraft-blond.vercel.app
+```
+
+### CI — GitHub Actions
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request, every push to `main`, and by hand (*Run workflow*).
+
+| Job | Runs | Needs |
+|---|---|---|
+| `verify` — *Lint, typecheck, unit tests, build* | `pnpm install --frozen-lockfile` → `pnpm lint` → `pnpm typecheck` → `pnpm test` → `pnpm build` | nothing: no secrets, no database |
+| `integration` — *Integration tests (Atlas)* | `pnpm db:push` → `pnpm test:integration` | `verify` passed, and the `TEST_DATABASE_URL` secret |
+
+- **Same toolchain as production.** Node 24 (the Vercel project's version) and pnpm from `packageManager` in `package.json`; the pnpm store is cached between runs.
+- **`verify` builds without credentials.** Only the dashboard page and the two GET routes read the database. All three are `force-dynamic`, and `/api-docs` is static, so `next build` never contacts Atlas or R2. A green `verify` means a clean checkout installs from the lockfile and builds the way Vercel will build it.
+- **The API spec is checked too.** `pnpm test` includes `tests/unit/api/openapi.test.ts`, so a route whose methods or error codes drift from `public/openapi.yaml` fails CI.
+- **`integration` runs against `signcraft_test`, never the demo data.** `DATABASE_URL` comes from the `TEST_DATABASE_URL` secret, and the `_test` guard in `tests/helpers/db-name.ts` still applies: a secret that names `signcraft` fails setup before anything is deleted. `pnpm db:push` creates the collections and unique indexes if the test database is new. R2 is mocked, so no R2 secrets are needed.
+- **One integration run at a time.** Every run wipes the same database, so the job uses a single concurrency group (`integration-db`) and runs queue instead of overlapping. Each run takes about 4.5 minutes.
+- **No secret, no integration run.** Pull requests from forks never receive secrets. Without the secret, `integration` is skipped and the run shows a warning; it does not fail.
+- **Superseded runs are cancelled** when a PR branch gets a newer push. Runs on `main` always finish.
+
+**One-time setup.** Store the test database's connection string as a repository secret. This command builds it from your `.env`, the same way as in [Tests](#tests), and pipes it to `gh`, so the value is never printed:
+
+```bash
+node -e "require('dotenv').config({path:'.env'});const u=process.env.DATABASE_URL;const [b,q]=u.split('?');process.stdout.write(b.replace(/\/signcraft$/,'/signcraft_test')+(q?'?'+q:''))" | gh secret set TEST_DATABASE_URL
+```
+
+Atlas must accept connections from GitHub-hosted runners, which have no fixed IP addresses. The cluster's `0.0.0.0/0` Network Access entry, which Vercel already needs, covers them.
+
+### CD — Vercel
+
+The Vercel project `signcraft` is connected to this repository, so the workflow has no deploy step and GitHub stores no Vercel token.
+
+- **Previews.** Every push to a PR branch gets its own deployment URL, which Vercel links on the pull request. At runtime a preview reads the Vercel environment variables set for *Preview*. If those have the same values as production, the preview writes to the same demo database and bucket.
+- **Production.** Every push to `main` is built with `pnpm build` on Node 24.x with Fluid compute (`vercel.json` pins the Next.js preset; `/api/events` sets `maxDuration = 300`). The build goes live at https://signcraft-blond.vercel.app when it is ready.
+- **Environment variables.** Set them in the Vercel project settings; the list is the one under [Configuration](#configuration).
+- **Schema changes are not deployed.** MongoDB has no migrations. Before merging a change that adds a collection or index, run `pnpm db:push` against the production database (the `DATABASE_URL` in your `.env`).
+- **Rollback.** Use Instant Rollback in the Vercel dashboard, or `vercel promote <earlier-deployment-url>`. Both switch traffic without a rebuild.
+
+**Gating production on CI.** Right now, Vercel promotes a `main` build as soon as it is ready, even if CI has not finished or has failed. Two settings would close that gap; neither is enabled in this repository yet:
+
+1. **Branch protection on `main`** (or a ruleset) that requires both checks, *Lint, typecheck, unit tests, build* and *Integration tests (Atlas)*, to pass before a pull request can merge. GitHub treats a skipped job as passing, so fork PRs are not blocked.
+2. **Vercel Deployment Checks** that import those same GitHub Actions results. Vercel then holds each production deployment until they pass and only then assigns the production domain.
+
 ## Trade-offs
 
 Each of these is an ADR in [`docs/superpowers/specs/2026-09-16-signcraft-decisions.md`](docs/superpowers/specs/2026-09-16-signcraft-decisions.md); the amendments recorded there during implementation are summarised here.
@@ -337,6 +392,7 @@ Each of these is an ADR in [`docs/superpowers/specs/2026-09-16-signcraft-decisio
 - **The whole board re-renders once per second, for the life of the page.** One shared `useNow` clock threads `now` down as a prop rather than giving every chip its own timer, and `components/dashboard.tsx` calls it unconditionally — the interval runs whether or not a claim is counting down, so the re-render is constant, not occasional. At eight orders this is free; a real board would gate the clock on there being a live claim, memoise the countdown subtree, or move the animation to CSS.
 - **`orderNumber` is generated with `count()` then `create`,** with a single retry on a unique-index collision. Not safe under heavy concurrent order creation (a sequence collection or a random suffix would be), but order creation is a one-at-a-time human action while the claim — which *is* contended — is properly atomic.
 - **No browser end-to-end tests.** Playwright would prove the two-tab race most convincingly, at about a day's work. The guarantee is proven in-process instead by the 50-way claim race, and the browser flows are covered by the checklist below.
+- **CI checks deployments but does not block them.** Vercel's Git integration builds and promotes `main` alongside the GitHub Actions run rather than after it. That keeps per-PR previews automatic and keeps a Vercel token out of GitHub; the cost is that a red CI run does not stop a production deploy until branch protection and Vercel Deployment Checks are enabled ([CI/CD](#cicd)). Integration runs also queue behind each other, about 4.5 minutes each, because they all share `signcraft_test`.
 
 ## Manual QA checklist
 
@@ -357,6 +413,7 @@ Roughly 10 minutes, and it exercises every flow in UI spec §7. Start here even 
 ## Repository layout
 
 ```
+.github/workflows/ci.yml   CI: lint, typecheck, unit tests, build, integration tests
 app/
   page.tsx                 server component: bootstrap fetch, renders <Dashboard>
   api/                     route handlers (thin: parse → persona → service → respond)

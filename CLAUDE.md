@@ -11,7 +11,7 @@ A technical-assessment micro-app: B2B signage marketplace dashboard. A human rev
 Read these before changing behaviour. If code and spec disagree, fix one and say which.
 
 - `docs/superpowers/specs/2026-09-16-signcraft-architecture-design.md` — data model, API, locking, realtime, upload pipeline, folder layout.
-- `docs/superpowers/specs/2026-09-16-signcraft-decisions.md` — 17 ADRs with alternatives. Do not re-litigate a decision silently; add or amend an ADR.
+- `docs/superpowers/specs/2026-09-16-signcraft-decisions.md` — 18 ADRs with alternatives. Do not re-litigate a decision silently; add or amend an ADR.
 - `docs/superpowers/specs/2026-09-16-signcraft-ui-pages-and-flows.md` — every screen, state, and flow.
 - `docs/design/` — visual design from Claude Design: `DESIGN.md` (tokens: colours, type scale, spacing, status hues) plus `screens/1a`–`1h` as reference HTML (board, detail sheet, dialogs, mobile, tablet). Use it for how things look; the UI spec wins on behaviour. Rebuild screens with Tailwind + Shadcn — never paste exported HTML into a component.
 - `public/openapi.yaml` — the API contract as implemented, rendered at `/api-docs`. `tests/unit/api/openapi.test.ts` fails if a route and the spec drift. When you add or change a route, update the spec in the same change.
@@ -110,3 +110,5 @@ MongoDB is Atlas in every environment; there is no local Mongo and no Docker in 
 ## Deployment
 
 Vercel (Node runtime, Fluid compute, `maxDuration = 300` on `/api/events`, build command `pnpm build`) + MongoDB Atlas M0 + Cloudflare R2. Vercel env vars are the same list as `.env.example`. The R2 bucket needs the CORS rule from the README, with both `http://localhost:3000` and the Vercel origin in `AllowedOrigins`, `AllowedHeaders: ["*"]`, and `ExposeHeaders: ["ETag"]`.
+
+CI is `.github/workflows/ci.yml` (ADR-018, README › CI/CD): `verify` (lint, typecheck, unit, build; no secrets) on every PR and push to `main`, then `integration` against `signcraft_test` when the `TEST_DATABASE_URL` repo secret exists. Deploys come from Vercel's GitHub integration, not from the workflow. Keep the workflow's Node version equal to the Vercel project's (24.x); if you add a GET route or page that reads the database at build time, `verify` will fail without secrets — make it `force-dynamic`.
