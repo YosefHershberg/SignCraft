@@ -1,0 +1,1848 @@
+openapi: 3.1.0
+
+info:
+  title: SignCraft API
+  version: 0.1.0
+  summary: REST + SSE API behind the SignCraft B2B signage marketplace dashboard.
+  description: |
+    The HTTP surface of SignCraft, a B2B signage marketplace dashboard. Everything
+    the browser does — the Kanban board, the install-job panel, the upload tray —
+    goes through the eleven operations documented here. All bodies and responses
+    are JSON except `GET /api/events`, which is an SSE stream.
+
+    ## Personas instead of auth
+
+    There is no login. Every request carries a **persona** in the `x-persona`
+    header: `ops`, `vendor:<24-hex ObjectId>` or `installer:<24-hex ObjectId>`
+    (`lib/api/persona.ts` over the pure parser in `lib/domain/personas.ts`). If the
+    header is absent the server falls back to the `sc_persona` cookie, which is what
+    makes a plain browser navigation work; the header always wins. Operations that
+    need a persona answer `403 FORBIDDEN_FOR_PERSONA` when it is missing, malformed
+    or of the wrong kind — `GET /api/bootstrap` and `GET /api/events` need none.
+
+    **Write authorisation is server-side and real**: every state change is re-checked
+    by `lib/domain/state-machine.ts` and `lib/domain/permissions.ts` no matter what
+    the UI offered. **Read filtering is client-side** (a vendor's board shows only
+    that vendor's orders): a spoofable header cannot be a confidentiality boundary,
+    so the API deliberately does not pretend otherwise — `GET /api/bootstrap` returns
+    every order to everyone, and the client narrows it.
+
+    ## Error envelope
+
+    Every failure is `{ "error": { "code", "message", "details"? } }` with a machine
+    `code` from a closed set of eleven (see `ErrorCode`), a human `message` safe to
+    show in a toast, and optional `details` the client acts on. `details` is shaped
+    per code — see `ErrorEnvelope`.
+
+    ## The three graded behaviours
+
+    **Order state machine.** `POST /api/orders/{id}/transition` *is* the state
+    machine: the body names a target `status`, not a button. The server checks the
+    edge against `TRANSITIONS` (`DRAFT → SUBMITTED → VENDOR_ACCEPTED → IN_PRODUCTION
+    → READY_FOR_INSTALL → COMPLETED`, with `CANCELLED` reachable only before
+    production), then who may take it, then the guards — and applies it as one
+    conditional `updateMany` filtered on `{id, status: from, version: expectedVersion}`.
+    An illegal jump is `400 INVALID_TRANSITION` carrying `details.allowed`, the exact
+    list of legal next statuses, which the dialog renders inline. A stale tab is
+    `409 VERSION_CONFLICT`.
+
+    **Claim race / double-booking prevention.** `POST /api/jobs/{id}/claim` is ONE
+    conditional `updateMany` whose filter is `OPEN OR (CLAIMED AND claim.expiresAt <
+    now)`. MongoDB serialises concurrent writers on the single job document, so when
+    N installers press Claim at the same instant exactly one update matches: that
+    caller gets `200` with a `ClaimDTO` and a 3-minute TTL, everyone else gets
+    `409 CLAIM_TAKEN`. There is no read-then-write, no transaction and no external
+    lock. Expiry is **lazy**: nothing wakes up at T+3min — every read passes the job
+    through `toPublicJob`, so a lapsed claim is *presented* as `OPEN` (the sweep at
+    the start of bootstrap/events only makes that visible to other tabs).
+    `POST /api/jobs/{id}/verify` closes the hold: `pass` → `ASSIGNED`, `fail` →
+    back to `OPEN`, and it is filtered on being the live claimant, hence
+    `409 CLAIM_EXPIRED` / `409 NOT_CLAIMANT`.
+
+    **Direct-to-cloud upload.** Bytes never pass through this API. `POST /api/assets`
+    opens a Cloudflare R2 multipart upload and returns the part plan;
+    `POST /api/assets/{id}/parts` presigns a batch of up to 20 part URLs; the
+    **browser PUTs each part straight to R2** at those URLs and reads the `ETag`
+    response header; `POST /api/assets/{id}/progress` records advisory progress so
+    other dashboards can watch the bar move over SSE; `POST /api/assets/{id}/complete`
+    hands the `{partNumber, etag}` list back to R2; `POST /api/assets/{id}/abort`
+    abandons the multipart upload so no orphaned parts are left. The route handlers
+    only presign, record and complete — which is also why a 2 GB upload works on
+    Vercel, where a request body is capped at 4.5 MB.
+
+  license:
+    name: UNLICENSED
+    identifier: LicenseRef-proprietary
+
+servers:
+  - url: http://localhost:3000
+    description: Local development (`pnpm dev`)
+  - url: https://signcraft-blond.vercel.app
+    description: Deployed demo
+
+tags:
+  - name: Bootstrap
+    description: The single full-state read the dashboard does on first render.
+  - name: Orders
+    description: Order creation and the state machine (graded behaviour 1).
+  - name: Jobs
+    description: Install-job claim, verification and lazy expiry (graded behaviour 2).
+  - name: Assets
+    description: The direct-to-cloud multipart upload pipeline (graded behaviour 3).
+  - name: Realtime
+    description: Server-sent events over MongoDB change streams — the fan-out all three pipelines rely on.
+
+paths:
+  /api/bootstrap:
+    get:
+      operationId: getBootstrap
+      tags: [Bootstrap]
+      summary: Full dashboard state for the first render
+      description: |
+        Callable by **any** persona — the `x-persona` header is not required and not
+        read here. Returns the vendors and installers (both alphabetical), every
+        order newest-first with its embedded `installJob` and `assets`, the server
+        clock and the configured claim TTL, in one round trip: the board, the detail
+        sheet and the upload tray all render from this single response, after which
+        `GET /api/events` keeps it fresh (no polling, Invariant 4).
+
+        Read filtering is **client-side**, so every order is returned to every
+        persona and `lib/board/visibility.ts` narrows the board (see the API
+        description). Before reading, the handler runs `releaseExpired()` — a
+        convenience sweep that flips lapsed CLAIMED jobs back to OPEN in the DB so
+        the write reaches other tabs over the change stream. Correctness does not
+        depend on it: the response passes every job through `toPublicJob`, so an
+        expired claim reads as `OPEN` regardless (Invariant 3).
+
+        `serverTime` seeds the client's shared 1 s clock so countdowns agree with
+        the server, and `claimTtlMs` reflects a `CLAIM_TTL_MS` override so UI copy
+        never hardcodes three minutes.
+      security: []
+      responses:
+        '200':
+          description: The whole dashboard state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BootstrapDTO'
+              examples:
+                bootstrap:
+                  $ref: '#/components/examples/Bootstrap'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/orders:
+    post:
+      operationId: createOrder
+      tags: [Orders]
+      summary: Create a DRAFT order
+      description: |
+        **Ops only** (`x-persona: ops`); any other persona is `403
+        FORBIDDEN_FOR_PERSONA`. Entry point of pipeline 1: the order is created in
+        `DRAFT` with a generated `orderNumber` (`SC-0001`-style, derived from the
+        current order count and retried once on a unique-index collision) and a
+        single history row `{from: null, to: DRAFT}`.
+
+        A DRAFT order accepts file uploads (`POST /api/assets`) and can only leave
+        DRAFT once at least one asset is `UPLOADED` — that guard is why the upload
+        pipeline and the state machine meet here.
+      security:
+        - persona: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderInput'
+            examples:
+              order:
+                summary: A storefront sign for two shopfronts
+                value:
+                  title: Storefront sign - Ridgeway Coffee
+                  customerName: Ridgeway Coffee
+                  signType: STOREFRONT
+                  widthCm: 240
+                  heightCm: 90
+                  quantity: 2
+                  vendorId: 665f1a2b3c4d5e6f7081a001
+                  installAddress: 18 Ridgeway Avenue, Leeds LS8 2AB
+                  dueDate: '2026-10-02T12:00:00.000Z'
+                  notes: Match the brand teal exactly.
+      responses:
+        '201':
+          description: The created order, in DRAFT with no job and no assets yet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDTO'
+              examples:
+                draft:
+                  $ref: '#/components/examples/DraftOrder'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/orders/{id}/transition:
+    post:
+      operationId: transitionOrder
+      tags: [Orders]
+      summary: Move an order to another status (graded behaviour 1)
+      description: |
+        **Any persona may call it; which persona may take which edge is fixed**
+        (`lib/domain/permissions.ts#checkTransition`):
+
+        | Target | Who | Guard |
+        |---|---|---|
+        | `SUBMITTED` | ops | at least one `UPLOADED` asset (`NO_UPLOADED_ASSET`) |
+        | `VENDOR_ACCEPTED`, `IN_PRODUCTION`, `READY_FOR_INSTALL` | the order's own vendor | — |
+        | `COMPLETED` | the installer the install job is `ASSIGNED` to | job must be ASSIGNED (`NO_ASSIGNED_INSTALLER`) |
+        | `CANCELLED` | ops or the owning vendor | only legal before `IN_PRODUCTION` |
+
+        The body names a **status**, not a button, so this endpoint *is* the state
+        machine. Checks run in a fixed order so the error is the most useful one:
+        the transition table first (`400 INVALID_TRANSITION` with
+        `details.allowed`, the list the dialog renders inline, regardless of
+        persona), then the persona rule (`403`), then the guards
+        (`400 GUARD_FAILED` with `details.reason`).
+
+        **Concurrency:** the write is one conditional `updateMany` filtered on
+        `{id, status: <from>, version: expectedVersion}` which also pushes the
+        history row; `count !== 1` — a stale tab, or a concurrent transition that
+        won the race — is `409 VERSION_CONFLICT`, never a lost update. Omitting
+        `expectedVersion` means "whatever the version is right now" and disables
+        that check. Reaching `READY_FOR_INSTALL` idempotently opens the OPEN
+        `InstallJob` that installers then race for (pipeline 2); the job is read
+        back through lazy expiry like every other read.
+      security:
+        - persona: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionInput'
+            examples:
+              markReady:
+                summary: Vendor marks an in-production order ready for install
+                value:
+                  to: READY_FOR_INSTALL
+                  expectedVersion: 3
+              cancel:
+                summary: Ops cancels with a reason recorded on the timeline
+                value:
+                  to: CANCELLED
+                  reason: Customer postponed the fit-out
+      responses:
+        '200':
+          description: The order after the transition, with its fresh history row and (from READY_FOR_INSTALL on) its install job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDTO'
+              examples:
+                order:
+                  $ref: '#/components/examples/ReadyOrder'
+        '400':
+          description: |
+            Illegal edge (`INVALID_TRANSITION`, `details` = `{from, to, allowed}`),
+            a failed guard (`GUARD_FAILED`, `details.reason`), or a body Zod
+            rejected (`VALIDATION_ERROR`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                invalidTransition:
+                  $ref: '#/components/examples/InvalidTransitionError'
+                guardFailed:
+                  $ref: '#/components/examples/GuardFailedError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/jobs/{id}/claim:
+    post:
+      operationId: claimJob
+      tags: [Jobs]
+      summary: Claim an install job (graded behaviour 2 - the race)
+      description: |
+        **Installer only** (`x-persona: installer:<id>`); ops and vendors get
+        `403`. No request body.
+
+        This is the double-booking test. The claim is **ONE conditional
+        `updateMany`** whose filter is the lock:
+
+        ```
+        { id, OR: [ { status: OPEN },
+                    { status: CLAIMED, claim.expiresAt < now } ] }
+        ```
+
+        setting `status: CLAIMED` and `claim: {installerId, claimedAt, expiresAt =
+        now + CLAIM_TTL_MS}`. MongoDB serialises concurrent writers on that single
+        document, so when N installers press Claim simultaneously exactly one
+        update matches: that caller gets `200` with a live `ClaimDTO`, every other
+        caller matches nothing and gets `409 CLAIM_TAKEN`. There is no
+        read-then-write, no transaction and no external lock (Invariant 2). The one
+        follow-up read only disambiguates `409 CLAIM_TAKEN` from `404 NOT_FOUND`;
+        it plays no part in the lock.
+
+        The `expired` arm of the filter is what makes **lazy expiry** work: a
+        claim that lapsed is takeable immediately, with no cron and no sweep having
+        run. Every read of a job (here, in bootstrap, and in every SSE frame) is
+        passed through `toPublicJob`, so a CLAIMED job past `expiresAt` is
+        presented as `{status: OPEN, claim: null}` (Invariant 3).
+      security:
+        - persona: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: You won the race. The job is CLAIMED by you until `claim.expiresAt`; verify before then or it reverts to OPEN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobDTO'
+              examples:
+                claimed:
+                  $ref: '#/components/examples/ClaimedJob'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Another installer holds a live claim, or the job is already ASSIGNED.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                claimTaken:
+                  $ref: '#/components/examples/ClaimTakenError'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/jobs/{id}/verify:
+    post:
+      operationId: verifyJob
+      tags: [Jobs]
+      summary: Resolve a claim - pass assigns the job, fail reopens it
+      description: |
+        **Installer only, and only the current claimant**, before the claim
+        expires. Like the claim itself this is one conditional `updateMany`, here
+        filtered on `{id, status: CLAIMED, claim.installerId: <you>,
+        claim.expiresAt > now}`:
+
+        - `outcome: pass` → `ASSIGNED`, `installerId` set, `claim` unset. Only then
+          may that installer move the order `READY_FOR_INSTALL → COMPLETED` via
+          `POST /api/orders/{id}/transition`.
+        - `outcome: fail` → back to `OPEN`, claim unset, so the job returns to the
+          marketplace for anyone to claim.
+
+        `count !== 1` is disambiguated by one follow-up read: the hold lapsed (or
+        the job is no longer CLAIMED) → `409 CLAIM_EXPIRED`; someone else holds it
+        → `409 NOT_CLAIMANT`.
+      security:
+        - persona: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyInput'
+            examples:
+              pass:
+                summary: Verification passed - take the job
+                value:
+                  outcome: pass
+              fail:
+                summary: Simulate failure - hand the job back to the marketplace
+                value:
+                  outcome: fail
+      responses:
+        '200':
+          description: The job after verification - ASSIGNED on `pass`, OPEN on `fail`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobDTO'
+              examples:
+                assigned:
+                  $ref: '#/components/examples/AssignedJob'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The claim lapsed (`CLAIM_EXPIRED`) or belongs to another installer (`NOT_CLAIMANT`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                claimExpired:
+                  $ref: '#/components/examples/ClaimExpiredError'
+                notClaimant:
+                  $ref: '#/components/examples/NotClaimantError'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/assets:
+    post:
+      operationId: createAsset
+      tags: [Assets]
+      summary: Open a multipart upload (graded behaviour 3, step 1)
+      description: |
+        **Ops only**, and only while the order is `DRAFT` or `SUBMITTED`
+        (`checkUpload`; otherwise `400 GUARD_FAILED` with
+        `details.reason: ORDER_NOT_UPLOADABLE`).
+
+        Step 1 of the direct-to-cloud pipeline. The server creates the `Asset` row
+        `PENDING`, derives the storage key `orders/<orderId>/<assetId>/<sanitised
+        name>` (which needs the generated id, hence create-then-update), opens the
+        R2 multipart upload and flips the row to `UPLOADING`. If R2 rejects the
+        create, the row is kept as `FAILED` so the UI can offer Retry rather than
+        the asset vanishing, and the call answers `502 STORAGE_ERROR`.
+
+        The response carries the whole `AssetDTO` (so the row renders at 0 %
+        without a second fetch) plus the part plan: `partSize` is 10 MiB and
+        `partCount` is how many parts the browser must PUT. **No bytes are sent
+        here** — the client now asks for presigned URLs and uploads straight to R2.
+        `simulated: true` marks a "Simulate large file" upload: zero-filled bytes
+        that are recreatable from `sizeBytes` on Retry.
+      security:
+        - persona: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssetInput'
+            examples:
+              simulated:
+                summary: Simulate a 100 MB artwork file
+                value:
+                  orderId: 665f1a2b3c4d5e6f70819200
+                  fileName: ridgeway-artwork.pdf
+                  contentType: application/pdf
+                  sizeBytes: 104857600
+                  simulated: true
+      responses:
+        '201':
+          description: The asset row plus the R2 upload id and the part plan the browser uploads against.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAssetResult'
+              examples:
+                created:
+                  $ref: '#/components/examples/CreateAssetResult'
+        '400':
+          description: Zod rejected the body (`VALIDATION_ERROR`), or the order no longer accepts files (`GUARD_FAILED` / `ORDER_NOT_UPLOADABLE`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                notUploadable:
+                  $ref: '#/components/examples/NotUploadableError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/StorageError'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/assets/{id}/parts:
+    post:
+      operationId: presignParts
+      tags: [Assets]
+      summary: Presign a batch of part URLs (graded behaviour 3, step 2)
+      description: |
+        **Ops only.** Step 2, called once per batch while the upload runs: the
+        uploader asks for up to `PRESIGN_BATCH` (20) part numbers at a time, then
+        four workers PUT those parts in parallel **directly to R2** at the returned
+        URLs and read the `ETag` response header (which is why the bucket CORS rule
+        must list `ExposeHeaders: ["ETag"]`). URLs are valid for one hour.
+
+        The order is re-checked on **every** call (`assertOrderStillUploadable`),
+        not just at create: a long upload can outlive the order's uploadable
+        window — the vendor may accept the order while parts are still in flight —
+        and the remaining parts must then stop being signed.
+        `409 VERSION_CONFLICT` with `details.status` means the asset itself is no
+        longer `PENDING`/`UPLOADING` (completed, aborted or failed underneath the
+        client).
+      security:
+        - persona: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartsInput'
+            examples:
+              firstBatch:
+                summary: The first four parts of a batch
+                value:
+                  partNumbers: [1, 2, 3, 4]
+      responses:
+        '200':
+          description: One presigned `PUT` URL per requested part number.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedPartsResult'
+              examples:
+                urls:
+                  $ref: '#/components/examples/PresignedParts'
+        '400':
+          description: Zod rejected the body, or the order left DRAFT/SUBMITTED mid-upload (`GUARD_FAILED` / `ORDER_NOT_UPLOADABLE`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                notUploadable:
+                  $ref: '#/components/examples/NotUploadableError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The asset is not PENDING/UPLOADING any more; `details.status` is what it actually is.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                assetConflict:
+                  $ref: '#/components/examples/AssetConflictError'
+        '502':
+          $ref: '#/components/responses/StorageError'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/assets/{id}/progress:
+    post:
+      operationId: reportProgress
+      tags: [Assets]
+      summary: Record advisory upload progress (graded behaviour 3, step 3)
+      description: |
+        **Ops only.** A **throttled advisory write**, not part of the upload's
+        correctness: the uploading tab sends it at most every 2 s, or when the
+        percentage moves by 5 points, or at 100 %, and swallows any failure. Its
+        only purpose is fan-out — the write reaches other dashboards through the
+        change stream, which is how a second tab's progress bar moves for an
+        upload it is not performing. The uploading tab itself renders a finer
+        local estimate.
+
+        `bytesUploaded` is clamped to the asset's `sizeBytes` server-side.
+        The write is a no-op unless the asset is `UPLOADING`, so a late ping cannot
+        resurrect a completed or aborted asset — and a **well-formed but unknown
+        asset id is a silent `204`, not a 404**. Only a malformed (non-ObjectId)
+        `id` is `404 NOT_FOUND`.
+      security:
+        - persona: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgressInput'
+            examples:
+              halfway:
+                summary: 50 MB of a 100 MB upload
+                value:
+                  bytesUploaded: 52428800
+      responses:
+        '204':
+          description: Recorded, or deliberately ignored (asset not UPLOADING, or unknown but well-formed id).
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/assets/{id}/complete:
+    post:
+      operationId: completeAsset
+      tags: [Assets]
+      summary: Complete the multipart upload (graded behaviour 3, step 4)
+      description: |
+        **Ops only.** Final step: the client hands back the `{partNumber, etag}`
+        pair R2 returned for every part it PUT, and the server asks R2 to assemble
+        the object. Parts are sorted by number server-side, since the parallel
+        workers may report them out of order.
+
+        On success the asset becomes `UPLOADED` with `progressPct: 100` and its
+        `uploadId` cleared — which is also the moment an ops user may submit the
+        order (the `NO_UPLOADED_ASSET` guard on `DRAFT → SUBMITTED`). If R2 fails,
+        the asset is marked `FAILED` (so the row offers Retry) and the call answers
+        `502 STORAGE_ERROR`. `409 VERSION_CONFLICT` with `details.status` means the
+        asset was not `UPLOADING` when the call arrived.
+      security:
+        - persona: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteInput'
+            examples:
+              tenParts:
+                summary: Two parts, as R2 reported them
+                value:
+                  parts:
+                    - partNumber: 1
+                      etag: '"9b2cf5f0a1f04a36b2a4d9f0a1f04a36"'
+                    - partNumber: 2
+                      etag: '"1c7de2b8c3e94f1aa0d8b7c6e5f40312"'
+      responses:
+        '200':
+          description: The asset, now UPLOADED at 100 %.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDTO'
+              examples:
+                uploaded:
+                  $ref: '#/components/examples/UploadedAsset'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The asset was not UPLOADING; `details.status` is what it actually is.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                assetConflict:
+                  $ref: '#/components/examples/AssetConflictError'
+        '502':
+          $ref: '#/components/responses/StorageError'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/assets/{id}/abort:
+    post:
+      operationId: abortAsset
+      tags: [Assets]
+      summary: Abandon a multipart upload
+      description: |
+        **Ops only.** Aborts the R2 multipart upload (best-effort, so no orphaned
+        parts are billed) and records the terminal status. The `reason` decides
+        only that status: `user` — someone pressed the ✕ — leaves the asset
+        `ABORTED`; `error`, which the uploader sends once it has exhausted its part
+        retries, leaves it `FAILED` so the row offers Retry.
+
+        **The body is optional** (`required: false`): a bare `POST` with no body —
+        what `curl` or `navigator.sendBeacon` sends — is valid and means
+        `reason: user`. Malformed JSON is `400 VALIDATION_ERROR`. An asset already
+        in a terminal state (`UPLOADED`, `FAILED`, `ABORTED`) is a no-op `204`.
+      security:
+        - persona: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbortInput'
+            examples:
+              userAbort:
+                summary: Explicit user abort (identical to sending no body at all)
+                value:
+                  reason: user
+              uploaderGaveUp:
+                summary: The uploader exhausted its retries - land the asset FAILED
+                value:
+                  reason: error
+      responses:
+        '204':
+          description: Aborted, or already terminal (no-op).
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+  /api/events:
+    get:
+      operationId: streamEvents
+      tags: [Realtime]
+      summary: Server-sent event stream over MongoDB change streams
+      description: |
+        Callable by **any** persona — no `x-persona` needed, and the stream is not
+        filtered per persona (read filtering is client-side). One `EventSource` per
+        open dashboard; this is the fan-out that makes a transition in one tab move
+        a card in another **with no polling** (Invariant 4). The handler sweeps
+        expired claims, then opens a single change stream over the `Order`,
+        `InstallJob` and `Asset` collections (`insert | update | replace`,
+        `fullDocument: 'updateLookup'`).
+
+        ### Frame protocol
+
+        ```text
+        : connected
+
+        id: 826B44A9270000000229...
+        event: job.updated
+        data: {"id":"665f1a2b3c4d5e6f7081c003","doc":{"id":"665f1a2b3c4d5e6f7081c003","orderId":"665f1a2b3c4d5e6f70819200","status":"CLAIMED","claim":{"installerId":"665f1a2b3c4d5e6f7081b002","claimedAt":"2026-09-16T10:12:04.000Z","expiresAt":"2026-09-16T10:15:04.000Z"},"installerId":null,"version":2,"createdAt":"2026-09-16T10:02:11.000Z","updatedAt":"2026-09-16T10:12:04.000Z"}}
+
+        : hb
+
+        event: reconnect
+        data: {}
+        ```
+
+        - `: connected` is sent once on open, and `: hb` every 15 s. Both are SSE
+          comments — invisible to `EventSource` listeners, there only so proxies do
+          not close an apparently idle connection.
+        - Named events are `order.created`, `order.updated`, `job.created`,
+          `job.updated`, `asset.created`, `asset.updated`. Each carries
+          `data: {"id", "doc"}` where `doc` is **the same public DTO the REST API
+          returns** — including lazy claim expiry, so a frame never shows a stale
+          CLAIMED — which is what lets one pure reducer patch the cache identically
+          from a REST response or a frame.
+        - `id:` is the MongoDB change-stream resume token. Send it back as
+          `Last-Event-ID` (the browser does this automatically) or as `?after=` to
+          resume exactly where the stream stopped.
+        - Control events carry `data: {}`: `reconnect` is sent at 280 s and the
+          stream then closes cleanly, so the client reopens before Vercel's 300 s
+          function ceiling cuts it off; `resync` means the resume token was lost
+          (Mongo 280/286) and the client should refetch `GET /api/bootstrap` — after
+          three of those the stream errors rather than looping.
+      security: []
+      parameters:
+        - name: after
+          in: query
+          required: false
+          description: A change-stream resume token (a previous frame's `id:`) to resume from. Used when the client reopens the stream itself after a `reconnect` frame.
+          schema:
+            type: string
+          example: 826B44A9270000000229
+        - name: Last-Event-ID
+          in: header
+          required: false
+          description: The standard SSE resume header, sent automatically by `EventSource`. Takes precedence over `after`.
+          schema:
+            type: string
+          example: 826B44A9270000000229
+      responses:
+        '200':
+          description: |
+            An open `text/event-stream`. The schema below describes one **named
+            event** of the stream, not the whole body: `event` is the frame's event
+            name and `data` is its parsed JSON payload.
+          headers:
+            Cache-Control:
+              description: Always `no-cache, no-transform`.
+              schema:
+                type: string
+            X-Accel-Buffering:
+              description: Always `no`, so a buffering proxy does not hold frames back.
+              schema:
+                type: string
+          content:
+            text/event-stream:
+              schema:
+                type: object
+                properties:
+                  event:
+                    $ref: '#/components/schemas/SseEventName'
+                  data:
+                    $ref: '#/components/schemas/SseEventData'
+                required: [event, data]
+              examples:
+                jobUpdated:
+                  $ref: '#/components/examples/SseJobFrame'
+        '500':
+          $ref: '#/components/responses/Internal'
+
+components:
+  securitySchemes:
+    persona:
+      type: apiKey
+      in: header
+      name: x-persona
+      description: |
+        The caller's persona: `ops`, `vendor:<24-hex ObjectId>` or
+        `installer:<24-hex ObjectId>`. There is no auth in this demo — the header
+        is the identity, which is exactly why **write** authorisation is
+        re-checked server-side on every request and **read** filtering is left to
+        the client. If the header is absent the server falls back to the
+        `sc_persona` cookie. Use "Authorize" above to set it for "Try it out";
+        real vendor and installer ids come from `GET /api/bootstrap`.
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: |
+        A 24-hex MongoDB ObjectId. `parseId` validates the shape before any DB
+        call, so a **malformed id is `404 NOT_FOUND`**, never a 500.
+      schema:
+        $ref: '#/components/schemas/ObjectId'
+
+  responses:
+    ValidationError:
+      description: The body failed Zod validation (or was not valid JSON). `details` is `z.flattenError`'s `{formErrors, fieldErrors}`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            zod:
+              $ref: '#/components/examples/ValidationErrorExample'
+    Forbidden:
+      description: The `x-persona` header (or `sc_persona` cookie) is missing, unparseable, or of the wrong kind for this operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            forbidden:
+              $ref: '#/components/examples/ForbiddenError'
+    NotFound:
+      description: No such order, job or asset - or a malformed (non-ObjectId) `id`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            notFound:
+              $ref: '#/components/examples/NotFoundError'
+    Conflict:
+      description: |
+        The resource changed underneath the caller: for an order, the status or
+        `version` moved between the client's snapshot and this write, so the
+        conditional update matched nothing.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            versionConflict:
+              $ref: '#/components/examples/VersionConflictError'
+    StorageError:
+      description: A Cloudflare R2 call failed. `details.op` names the S3 operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            storage:
+              $ref: '#/components/examples/StorageErrorExample'
+    Internal:
+      description: Unhandled server error. The cause is logged, never returned.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            internal:
+              $ref: '#/components/examples/InternalError'
+
+  schemas:
+    ObjectId:
+      type: string
+      pattern: '^[0-9a-f]{24}$'
+      description: A 24-character lowercase-hex MongoDB ObjectId.
+      examples: ['665f1a2b3c4d5e6f70819200']
+
+    Persona:
+      type: string
+      pattern: '^(ops|vendor:[0-9a-f]{24}|installer:[0-9a-f]{24})$'
+      description: The `x-persona` header value - `ops`, or `vendor:`/`installer:` followed by that party's ObjectId.
+      examples: ['ops', 'installer:665f1a2b3c4d5e6f7081b002']
+
+    OrderStatus:
+      type: string
+      description: |
+        Order lifecycle in board order. Legal edges: `DRAFT → SUBMITTED →
+        VENDOR_ACCEPTED → IN_PRODUCTION → READY_FOR_INSTALL → COMPLETED`, plus
+        `CANCELLED` from DRAFT, SUBMITTED or VENDOR_ACCEPTED only. COMPLETED and
+        CANCELLED are terminal.
+      enum:
+        - DRAFT
+        - SUBMITTED
+        - VENDOR_ACCEPTED
+        - IN_PRODUCTION
+        - READY_FOR_INSTALL
+        - COMPLETED
+        - CANCELLED
+
+    JobStatus:
+      type: string
+      description: |
+        Install-job lifecycle: `OPEN` on the marketplace → `CLAIMED` (held under a
+        TTL by one installer) → `ASSIGNED` (claim verified). A CLAIMED job whose
+        TTL has lapsed is *presented* as OPEN by every read.
+      enum: [OPEN, CLAIMED, ASSIGNED]
+
+    AssetStatus:
+      type: string
+      description: |
+        Upload lifecycle: `PENDING` (row exists, no R2 multipart yet) →
+        `UPLOADING` → `UPLOADED`; terminal `FAILED` (R2 error or retries
+        exhausted - the UI offers Retry) and `ABORTED` (user pressed ✕).
+      enum: [PENDING, UPLOADING, UPLOADED, FAILED, ABORTED]
+
+    SignType:
+      type: string
+      enum: [STOREFRONT, WAYFINDING, VEHICLE_WRAP, BANNER, MONUMENT]
+
+    ActorType:
+      type: string
+      description: Who performed a transition. `SYSTEM` only appears on seeded rows.
+      enum: [OPS, VENDOR, INSTALLER, SYSTEM]
+
+    TransitionDTO:
+      type: object
+      description: One row of an order's embedded, append-only history.
+      properties:
+        from:
+          description: The status moved away from; `null` only on the creation row.
+          oneOf:
+            - $ref: '#/components/schemas/OrderStatus'
+            - type: 'null'
+        to:
+          $ref: '#/components/schemas/OrderStatus'
+        actorType:
+          $ref: '#/components/schemas/ActorType'
+        actorId:
+          description: The vendor or installer who acted; `null` for ops and system rows.
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: 'null'
+        reason:
+          description: Free text from the transition dialog (the cancel dialog asks for one).
+          type: [string, 'null']
+          maxLength: 500
+        at:
+          type: string
+          format: date-time
+      required: [from, to, actorType, actorId, reason, at]
+
+    VendorDTO:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        name:
+          type: string
+      required: [id, name]
+
+    InstallerDTO:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        name:
+          type: string
+      required: [id, name]
+
+    ClaimDTO:
+      type: object
+      description: |
+        The live hold on a CLAIMED job. `expiresAt - claimedAt` is the TTL the
+        server applied, which is what the countdown ring reads (rather than the
+        configured default) so a `CLAIM_TTL_MS` override never desyncs it.
+      properties:
+        installerId:
+          $ref: '#/components/schemas/ObjectId'
+        claimedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+      required: [installerId, claimedAt, expiresAt]
+
+    JobDTO:
+      type: object
+      description: |
+        Public view of an install job. Always passed through lazy expiry on the
+        way out, so `status` already accounts for a lapsed claim (Invariant 3).
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        orderId:
+          $ref: '#/components/schemas/ObjectId'
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        claim:
+          description: Present only while CLAIMED and unexpired; `null` when OPEN or ASSIGNED.
+          oneOf:
+            - $ref: '#/components/schemas/ClaimDTO'
+            - type: 'null'
+        installerId:
+          description: Set only once ASSIGNED; until then the claimant's id lives in `claim`.
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: 'null'
+        version:
+          type: integer
+          minimum: 0
+          description: Bumped by every claim/verify/release write, so stale realtime frames can be dropped.
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required: [id, orderId, status, claim, installerId, version, createdAt, updatedAt]
+
+    AssetDTO:
+      type: object
+      description: |
+        Public view of an upload. The R2 `uploadId` is deliberately absent: it is
+        server-side state, cleared on complete/abort, and the client only ever
+        needs the presigned part URLs derived from it.
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        orderId:
+          $ref: '#/components/schemas/ObjectId'
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contentType:
+          type: string
+          minLength: 1
+          maxLength: 120
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+          description: A BigInt in the database, serialised as a JSON number at the API boundary.
+        storageKey:
+          type: string
+          description: '`orders/<orderId>/<assetId>/<sanitised file name>` in the R2 bucket.'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/AssetStatus'
+        bytesUploaded:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Last advisory progress write, clamped to `sizeBytes`. BigInt in the database, number on the wire.
+          readOnly: true
+        progressPct:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Coarse server-recorded progress that *other* dashboards render; the uploading tab shows its own finer local estimate.
+          readOnly: true
+        simulated:
+          type: boolean
+          description: A "Simulate large file" upload - zero-filled bytes, recreatable from `sizeBytes` on Retry.
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - id
+        - orderId
+        - fileName
+        - contentType
+        - sizeBytes
+        - storageKey
+        - status
+        - bytesUploaded
+        - progressPct
+        - simulated
+        - createdAt
+        - updatedAt
+
+    OrderDTO:
+      type: object
+      description: The order as the board and detail sheet see it, with its history and relations embedded.
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        orderNumber:
+          type: string
+          pattern: '^SC-[0-9]{4,}$'
+          description: Generated, human-facing reference such as `SC-0009`.
+          readOnly: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        customerName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        signType:
+          $ref: '#/components/schemas/SignType'
+        widthCm:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        heightCm:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        installAddress:
+          type: string
+          minLength: 1
+          maxLength: 300
+        dueDate:
+          type: string
+          format: date-time
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+        vendorId:
+          $ref: '#/components/schemas/ObjectId'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        version:
+          type: integer
+          minimum: 0
+          description: |
+            Optimistic-concurrency token. The transition dialog snapshots it when
+            it opens and sends it back as `expectedVersion`, so a stale tab gets
+            `409 VERSION_CONFLICT` instead of overwriting a newer state.
+          readOnly: true
+        history:
+          type: array
+          description: Append-only, oldest first.
+          items:
+            $ref: '#/components/schemas/TransitionDTO'
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        installJob:
+          description: '`null` until the order reaches READY_FOR_INSTALL, which opens the job.'
+          oneOf:
+            - $ref: '#/components/schemas/JobDTO'
+            - type: 'null'
+        assets:
+          type: array
+          description: Uploads attached to this order, oldest first.
+          items:
+            $ref: '#/components/schemas/AssetDTO'
+      required:
+        - id
+        - orderNumber
+        - title
+        - customerName
+        - signType
+        - widthCm
+        - heightCm
+        - quantity
+        - installAddress
+        - dueDate
+        - notes
+        - vendorId
+        - status
+        - version
+        - history
+        - createdAt
+        - updatedAt
+        - installJob
+        - assets
+
+    BootstrapDTO:
+      type: object
+      description: Everything the dashboard needs for its first render.
+      properties:
+        vendors:
+          type: array
+          items:
+            $ref: '#/components/schemas/VendorDTO'
+        installers:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstallerDTO'
+        orders:
+          type: array
+          description: Newest first, each with `installJob` and `assets`, lazy expiry applied.
+          items:
+            $ref: '#/components/schemas/OrderDTO'
+        serverTime:
+          type: string
+          format: date-time
+          description: Seeds the client's shared clock so server and first client render agree on countdowns.
+        claimTtlMs:
+          type: integer
+          minimum: 1
+          description: The server's claim TTL (default 180000; overridable with `CLAIM_TTL_MS`), so UI copy matches the real hold.
+      required: [vendors, installers, orders, serverTime, claimTtlMs]
+
+    CreateOrderInput:
+      type: object
+      description: Body of `POST /api/orders`; mirrors `createOrderSchema`. Strings are trimmed server-side.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        customerName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        signType:
+          $ref: '#/components/schemas/SignType'
+        widthCm:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        heightCm:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        vendorId:
+          $ref: '#/components/schemas/ObjectId'
+        installAddress:
+          type: string
+          minLength: 1
+          maxLength: 300
+        dueDate:
+          type: string
+          format: date-time
+          description: Any string `Date.parse` accepts; the UI sends an ISO timestamp at noon UTC so the day is stable across time zones.
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+      required:
+        - title
+        - customerName
+        - signType
+        - widthCm
+        - heightCm
+        - quantity
+        - vendorId
+        - installAddress
+        - dueDate
+
+    TransitionInput:
+      type: object
+      description: Body of `POST /api/orders/{id}/transition`; mirrors `transitionSchema`.
+      properties:
+        to:
+          $ref: '#/components/schemas/OrderStatus'
+        expectedVersion:
+          type: integer
+          minimum: 0
+          description: The client's snapshot of `OrderDTO.version`. Omit it to mean "whatever the version is now" and skip the optimistic-concurrency check.
+        reason:
+          type: string
+          maxLength: 500
+          description: Stored on the history row and shown on the timeline.
+      required: [to]
+
+    VerifyInput:
+      type: object
+      description: Body of `POST /api/jobs/{id}/verify`.
+      properties:
+        outcome:
+          type: string
+          enum: [pass, fail]
+          description: '`pass` assigns the job to you; `fail` reopens it for the marketplace.'
+      required: [outcome]
+
+    CreateAssetInput:
+      type: object
+      description: Body of `POST /api/assets`; mirrors `createAssetSchema`.
+      properties:
+        orderId:
+          $ref: '#/components/schemas/ObjectId'
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contentType:
+          type: string
+          minLength: 1
+          maxLength: 120
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 53687091200
+          description: Up to 50 GiB - the cap that keeps the 10 MiB part count inside S3's 10 000-part limit.
+        simulated:
+          type: boolean
+          default: false
+          description: Mark this as a zero-filled "Simulate large file" upload.
+      required: [orderId, fileName, contentType, sizeBytes]
+
+    CreateAssetResult:
+      type: object
+      description: The asset row plus the part plan the browser uploads against.
+      properties:
+        asset:
+          $ref: '#/components/schemas/AssetDTO'
+        uploadId:
+          type: string
+          description: The R2 multipart upload id. Returned so the client can see the upload exists; part URLs are presigned server-side from it.
+        partSize:
+          type: integer
+          description: Bytes per part - 10 MiB (10485760). The last part may be smaller.
+        partCount:
+          type: integer
+          minimum: 1
+          description: How many parts the browser must PUT.
+      required: [asset, uploadId, partSize, partCount]
+
+    PartsInput:
+      type: object
+      description: Body of `POST /api/assets/{id}/parts`; one uploader batch at a time.
+      properties:
+        partNumbers:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: 1-based part numbers, at most `PRESIGN_BATCH` (20) per request.
+          items:
+            type: integer
+            minimum: 1
+            maximum: 10000
+      required: [partNumbers]
+
+    PresignedPartsResult:
+      type: object
+      properties:
+        urls:
+          type: array
+          items:
+            type: object
+            properties:
+              partNumber:
+                type: integer
+                minimum: 1
+                maximum: 10000
+              url:
+                type: string
+                format: uri
+                description: A presigned R2 `PUT` URL, valid for one hour. The browser uploads the part body here - never through this API.
+            required: [partNumber, url]
+      required: [urls]
+
+    ProgressInput:
+      type: object
+      description: Body of `POST /api/assets/{id}/progress`.
+      properties:
+        bytesUploaded:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Bytes confirmed uploaded so far; clamped to the asset's `sizeBytes` server-side.
+      required: [bytesUploaded]
+
+    CompleteInput:
+      type: object
+      description: Body of `POST /api/assets/{id}/complete` - the ETags R2 returned for each part.
+      properties:
+        parts:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            type: object
+            properties:
+              partNumber:
+                type: integer
+                minimum: 1
+              etag:
+                type: string
+                minLength: 1
+                maxLength: 128
+                description: The `ETag` response header R2 returned for that part, quotes included.
+            required: [partNumber, etag]
+      required: [parts]
+
+    AbortInput:
+      type: object
+      description: |
+        Optional body of `POST /api/assets/{id}/abort`. Sending no body at all is
+        equivalent to `{"reason": "user"}`.
+      properties:
+        reason:
+          type: string
+          enum: [user, error]
+          default: user
+          description: '`user` leaves the asset ABORTED; `error` (the uploader gave up) leaves it FAILED so the row offers Retry.'
+
+    ErrorCode:
+      type: string
+      description: The closed set of machine-readable error codes the client switches on.
+      enum:
+        - VALIDATION_ERROR
+        - INVALID_TRANSITION
+        - GUARD_FAILED
+        - FORBIDDEN_FOR_PERSONA
+        - NOT_FOUND
+        - VERSION_CONFLICT
+        - CLAIM_TAKEN
+        - CLAIM_EXPIRED
+        - NOT_CLAIMANT
+        - STORAGE_ERROR
+        - INTERNAL
+
+    ErrorEnvelope:
+      type: object
+      description: |
+        Every failed response. `message` is human copy safe to show verbatim;
+        `details` is shaped per `code`:
+
+        - `INVALID_TRANSITION` (400) - `{from, to, allowed}`, where `allowed` is
+          the exact list of legal next statuses, rendered inline by the dialog.
+        - `GUARD_FAILED` (400) - `{reason}`, one of `NO_UPLOADED_ASSET` (submit
+          needs an uploaded file), `NO_ASSIGNED_INSTALLER` (complete needs the job
+          ASSIGNED to you), `ORDER_NOT_UPLOADABLE` (files only while DRAFT or
+          SUBMITTED).
+        - `VALIDATION_ERROR` (400) - Zod's `flattenError` output,
+          `{formErrors: string[], fieldErrors: {<field>: string[]}}`.
+        - `VERSION_CONFLICT` (409) on an **asset** - `{status}`, the asset status
+          that made the call illegal. On an **order** there are no details.
+        - `STORAGE_ERROR` (502) - `{op}`, the failed S3 operation
+          (`createMultipart`, `presignPart`, `completeMultipart`, `abortMultipart`).
+        - Every other code omits `details`.
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              $ref: '#/components/schemas/ErrorCode'
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+              description: Code-specific payload; absent for codes that carry none.
+          required: [code, message]
+      required: [error]
+
+    SseEventName:
+      type: string
+      description: |
+        The named events `GET /api/events` emits for data changes. The control
+        events `reconnect` and `resync` are not data frames - they carry `data: {}`
+        and are documented on the operation.
+      enum:
+        - order.created
+        - order.updated
+        - job.created
+        - job.updated
+        - asset.created
+        - asset.updated
+
+    SseEventData:
+      type: object
+      description: |
+        The JSON on a named frame's `data:` line. `doc` is the same public DTO the
+        REST API returns for that collection - including lazy claim expiry - so one
+        pure reducer patches the client cache identically from a REST response or a
+        frame.
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        doc:
+          description: The changed document as an `OrderDTO`, `JobDTO` or `AssetDTO`, matching the event name.
+          oneOf:
+            - $ref: '#/components/schemas/OrderDTO'
+            - $ref: '#/components/schemas/JobDTO'
+            - $ref: '#/components/schemas/AssetDTO'
+      required: [id, doc]
+
+  examples:
+    DraftOrder:
+      summary: A freshly created DRAFT order
+      value:
+        id: 665f1a2b3c4d5e6f70819200
+        orderNumber: SC-0009
+        title: Storefront sign - Ridgeway Coffee
+        customerName: Ridgeway Coffee
+        signType: STOREFRONT
+        widthCm: 240
+        heightCm: 90
+        quantity: 2
+        installAddress: 18 Ridgeway Avenue, Leeds LS8 2AB
+        dueDate: '2026-10-02T12:00:00.000Z'
+        notes: Match the brand teal exactly.
+        vendorId: 665f1a2b3c4d5e6f7081a001
+        status: DRAFT
+        version: 0
+        history:
+          - from: null
+            to: DRAFT
+            actorType: OPS
+            actorId: null
+            reason: null
+            at: '2026-09-16T09:41:00.000Z'
+        createdAt: '2026-09-16T09:41:00.000Z'
+        updatedAt: '2026-09-16T09:41:00.000Z'
+        installJob: null
+        assets: []
+
+    ReadyOrder:
+      summary: The same order at READY_FOR_INSTALL, with its job claimed and its artwork uploaded
+      value:
+        id: 665f1a2b3c4d5e6f70819200
+        orderNumber: SC-0009
+        title: Storefront sign - Ridgeway Coffee
+        customerName: Ridgeway Coffee
+        signType: STOREFRONT
+        widthCm: 240
+        heightCm: 90
+        quantity: 2
+        installAddress: 18 Ridgeway Avenue, Leeds LS8 2AB
+        dueDate: '2026-10-02T12:00:00.000Z'
+        notes: Match the brand teal exactly.
+        vendorId: 665f1a2b3c4d5e6f7081a001
+        status: READY_FOR_INSTALL
+        version: 4
+        history:
+          - from: null
+            to: DRAFT
+            actorType: OPS
+            actorId: null
+            reason: null
+            at: '2026-09-16T09:41:00.000Z'
+          - from: DRAFT
+            to: SUBMITTED
+            actorType: OPS
+            actorId: null
+            reason: null
+            at: '2026-09-16T09:52:18.000Z'
+          - from: SUBMITTED
+            to: VENDOR_ACCEPTED
+            actorType: VENDOR
+            actorId: 665f1a2b3c4d5e6f7081a001
+            reason: null
+            at: '2026-09-16T09:58:02.000Z'
+          - from: VENDOR_ACCEPTED
+            to: IN_PRODUCTION
+            actorType: VENDOR
+            actorId: 665f1a2b3c4d5e6f7081a001
+            reason: null
+            at: '2026-09-16T10:00:47.000Z'
+          - from: IN_PRODUCTION
+            to: READY_FOR_INSTALL
+            actorType: VENDOR
+            actorId: 665f1a2b3c4d5e6f7081a001
+            reason: Printed and laminated, ready for fitting
+            at: '2026-09-16T10:02:11.000Z'
+        createdAt: '2026-09-16T09:41:00.000Z'
+        updatedAt: '2026-09-16T10:02:11.000Z'
+        installJob:
+          id: 665f1a2b3c4d5e6f7081c003
+          orderId: 665f1a2b3c4d5e6f70819200
+          status: CLAIMED
+          claim:
+            installerId: 665f1a2b3c4d5e6f7081b002
+            claimedAt: '2026-09-16T10:12:04.000Z'
+            expiresAt: '2026-09-16T10:15:04.000Z'
+          installerId: null
+          version: 2
+          createdAt: '2026-09-16T10:02:11.000Z'
+          updatedAt: '2026-09-16T10:12:04.000Z'
+        assets:
+          - id: 665f1a2b3c4d5e6f7081d004
+            orderId: 665f1a2b3c4d5e6f70819200
+            fileName: ridgeway-artwork.pdf
+            contentType: application/pdf
+            sizeBytes: 104857600
+            storageKey: orders/665f1a2b3c4d5e6f70819200/665f1a2b3c4d5e6f7081d004/ridgeway-artwork.pdf
+            status: UPLOADED
+            bytesUploaded: 104857600
+            progressPct: 100
+            simulated: true
+            createdAt: '2026-09-16T09:44:30.000Z'
+            updatedAt: '2026-09-16T09:51:02.000Z'
+
+    ClaimedJob:
+      summary: You won the claim race - a live 3-minute hold
+      value:
+        id: 665f1a2b3c4d5e6f7081c003
+        orderId: 665f1a2b3c4d5e6f70819200
+        status: CLAIMED
+        claim:
+          installerId: 665f1a2b3c4d5e6f7081b002
+          claimedAt: '2026-09-16T10:12:04.000Z'
+          expiresAt: '2026-09-16T10:15:04.000Z'
+        installerId: null
+        version: 2
+        createdAt: '2026-09-16T10:02:11.000Z'
+        updatedAt: '2026-09-16T10:12:04.000Z'
+
+    AssignedJob:
+      summary: Verification passed - the job is yours and the claim is released
+      value:
+        id: 665f1a2b3c4d5e6f7081c003
+        orderId: 665f1a2b3c4d5e6f70819200
+        status: ASSIGNED
+        claim: null
+        installerId: 665f1a2b3c4d5e6f7081b002
+        version: 3
+        createdAt: '2026-09-16T10:02:11.000Z'
+        updatedAt: '2026-09-16T10:13:26.000Z'
+
+    UploadedAsset:
+      summary: A completed 100 MB upload
+      value:
+        id: 665f1a2b3c4d5e6f7081d004
+        orderId: 665f1a2b3c4d5e6f70819200
+        fileName: ridgeway-artwork.pdf
+        contentType: application/pdf
+        sizeBytes: 104857600
+        storageKey: orders/665f1a2b3c4d5e6f70819200/665f1a2b3c4d5e6f7081d004/ridgeway-artwork.pdf
+        status: UPLOADED
+        bytesUploaded: 104857600
+        progressPct: 100
+        simulated: true
+        createdAt: '2026-09-16T09:44:30.000Z'
+        updatedAt: '2026-09-16T09:51:02.000Z'
+
+    CreateAssetResult:
+      summary: Multipart upload opened - ten 10 MiB parts to PUT
+      value:
+        asset:
+          id: 665f1a2b3c4d5e6f7081d004
+          orderId: 665f1a2b3c4d5e6f70819200
+          fileName: ridgeway-artwork.pdf
+          contentType: application/pdf
+          sizeBytes: 104857600
+          storageKey: orders/665f1a2b3c4d5e6f70819200/665f1a2b3c4d5e6f7081d004/ridgeway-artwork.pdf
+          status: UPLOADING
+          bytesUploaded: 0
+          progressPct: 0
+          simulated: true
+          createdAt: '2026-09-16T09:44:30.000Z'
+          updatedAt: '2026-09-16T09:44:31.000Z'
+        uploadId: ABPnzm7Qd5s0oV2v0m0gkHqk2sVh6ZQ0lKk
+        partSize: 10485760
+        partCount: 10
+
+    PresignedParts:
+      summary: Two presigned part URLs (truncated for readability)
+      value:
+        urls:
+          - partNumber: 1
+            url: https://signcraft.r2.cloudflarestorage.com/orders/665f1a2b3c4d5e6f70819200/665f1a2b3c4d5e6f7081d004/ridgeway-artwork.pdf?partNumber=1&uploadId=ABPnzm7Qd5s0oV2v&X-Amz-Expires=3600&X-Amz-Signature=8f1c
+          - partNumber: 2
+            url: https://signcraft.r2.cloudflarestorage.com/orders/665f1a2b3c4d5e6f70819200/665f1a2b3c4d5e6f7081d004/ridgeway-artwork.pdf?partNumber=2&uploadId=ABPnzm7Qd5s0oV2v&X-Amz-Expires=3600&X-Amz-Signature=3b7e
+
+    Bootstrap:
+      summary: First-render state with one order
+      value:
+        vendors:
+          - id: 665f1a2b3c4d5e6f7081a001
+            name: Brightline Fabrication
+          - id: 665f1a2b3c4d5e6f7081a002
+            name: Northgate Signs
+        installers:
+          - id: 665f1a2b3c4d5e6f7081b002
+            name: Dana K.
+          - id: 665f1a2b3c4d5e6f7081b003
+            name: Omar S.
+        orders:
+          - id: 665f1a2b3c4d5e6f70819200
+            orderNumber: SC-0009
+            title: Storefront sign - Ridgeway Coffee
+            customerName: Ridgeway Coffee
+            signType: STOREFRONT
+            widthCm: 240
+            heightCm: 90
+            quantity: 2
+            installAddress: 18 Ridgeway Avenue, Leeds LS8 2AB
+            dueDate: '2026-10-02T12:00:00.000Z'
+            notes: null
+            vendorId: 665f1a2b3c4d5e6f7081a001
+            status: DRAFT
+            version: 0
+            history:
+              - from: null
+                to: DRAFT
+                actorType: OPS
+                actorId: null
+                reason: null
+                at: '2026-09-16T09:41:00.000Z'
+            createdAt: '2026-09-16T09:41:00.000Z'
+            updatedAt: '2026-09-16T09:41:00.000Z'
+            installJob: null
+            assets: []
+        serverTime: '2026-09-16T10:12:40.000Z'
+        claimTtlMs: 180000
+
+    SseJobFrame:
+      summary: The `job.updated` frame every other tab receives when a claim lands
+      value:
+        event: job.updated
+        data:
+          id: 665f1a2b3c4d5e6f7081c003
+          doc:
+            id: 665f1a2b3c4d5e6f7081c003
+            orderId: 665f1a2b3c4d5e6f70819200
+            status: CLAIMED
+            claim:
+              installerId: 665f1a2b3c4d5e6f7081b002
+              claimedAt: '2026-09-16T10:12:04.000Z'
+              expiresAt: '2026-09-16T10:15:04.000Z'
+            installerId: null
+            version: 2
+            createdAt: '2026-09-16T10:02:11.000Z'
+            updatedAt: '2026-09-16T10:12:04.000Z'
+
+    ValidationErrorExample:
+      summary: Zod rejected two fields
+      value:
+        error:
+          code: VALIDATION_ERROR
+          message: Invalid request
+          details:
+            formErrors: []
+            fieldErrors:
+              title: ['Too small: expected string to have >=1 characters']
+              quantity: ['Too big: expected number to be <=1000']
+
+    InvalidTransitionError:
+      summary: An illegal edge, with the exact allowed list the dialog renders
+      value:
+        error:
+          code: INVALID_TRANSITION
+          message: Cannot move DRAFT to IN_PRODUCTION
+          details:
+            from: DRAFT
+            to: IN_PRODUCTION
+            allowed: [SUBMITTED, CANCELLED]
+
+    GuardFailedError:
+      summary: A legal edge whose guard is not satisfied
+      value:
+        error:
+          code: GUARD_FAILED
+          message: Needs at least one uploaded file
+          details:
+            reason: NO_UPLOADED_ASSET
+
+    NotUploadableError:
+      summary: The order left DRAFT/SUBMITTED, so it no longer accepts files
+      value:
+        error:
+          code: GUARD_FAILED
+          message: Files can only be uploaded while the order is Draft or Submitted
+          details:
+            reason: ORDER_NOT_UPLOADABLE
+
+    ForbiddenError:
+      summary: Wrong (or missing) persona for this operation
+      value:
+        error:
+          code: FORBIDDEN_FOR_PERSONA
+          message: This action is not available for your persona
+
+    NotFoundError:
+      value:
+        error:
+          code: NOT_FOUND
+          message: Not found
+
+    VersionConflictError:
+      summary: The client's `expectedVersion` no longer matches
+      value:
+        error:
+          code: VERSION_CONFLICT
+          message: The order changed; refresh and try again
+
+    AssetConflictError:
+      summary: The asset is no longer in an uploadable state
+      value:
+        error:
+          code: VERSION_CONFLICT
+          message: The order changed; refresh and try again
+          details:
+            status: ABORTED
+
+    ClaimTakenError:
+      summary: You lost the claim race
+      value:
+        error:
+          code: CLAIM_TAKEN
+          message: Another installer claimed this job a moment ago
+
+    ClaimExpiredError:
+      value:
+        error:
+          code: CLAIM_EXPIRED
+          message: Your claim has expired
+
+    NotClaimantError:
+      value:
+        error:
+          code: NOT_CLAIMANT
+          message: You are not the installer who claimed this job
+
+    StorageErrorExample:
+      summary: R2 refused the multipart create
+      value:
+        error:
+          code: STORAGE_ERROR
+          message: Storage request failed
+          details:
+            op: createMultipart
+
+    InternalError:
+      value:
+        error:
+          code: INTERNAL
+          message: Internal server error
