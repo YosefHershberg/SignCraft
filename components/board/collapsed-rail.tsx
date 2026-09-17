@@ -1,9 +1,15 @@
 'use client';
 
+// components/board — the 40px stand-in for a status that `columnMode`
+// (`lib/board/visibility.ts`) says is not a column for this persona: every
+// non-marketplace status for an installer, and CANCELLED for everyone until
+// it is expanded. Rendered by `KanbanBoard` in place of a `StatusColumn`.
+
 import { STATUS_META } from '@/lib/domain/status-meta';
 import type { OrderStatus } from '@/lib/domain/types';
 import { cn } from '@/lib/utils';
 
+/** Shared frame for both variants so the button and the group are pixel-identical. */
 const SHELL = 'flex w-10 flex-none snap-start flex-col items-center gap-2.5 rounded-[8px] bg-slate-100 py-2';
 
 /**
@@ -17,7 +23,9 @@ export function CollapsedRail({
   onExpand,
 }: {
   status: OrderStatus;
+  /** Visible orders in this status (already persona-filtered by the board). */
   count: number;
+  /** Only the CANCELLED rail gets one; the board flips `expandedCancelled` and re-renders it as a column. */
   onExpand?: () => void;
 }) {
   const meta = STATUS_META[status];

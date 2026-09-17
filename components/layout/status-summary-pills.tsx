@@ -1,5 +1,8 @@
 'use client';
 
+// components/layout — per-status counts in the header, derived from the same
+// `lib/board/visibility.ts` rules as the board so the two never disagree.
+
 import { mobileStatuses, visibleOrders } from '@/lib/board/visibility';
 import { STATUS_META } from '@/lib/domain/status-meta';
 import { ORDER_STATUSES, type OrderDTO } from '@/lib/domain/types';

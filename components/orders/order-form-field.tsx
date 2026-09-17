@@ -1,5 +1,11 @@
 'use client';
 
+// components/orders — field primitives and the string↔schema bridge for
+// `CreateOrderDialog`. The form keeps every value as a string (what inputs
+// produce); `coerce`/`buildInput` turn that back into the shape
+// `createOrderSchema` (`lib/domain/schemas.ts`) expects, so ONE Zod schema
+// validates both the form and the `POST /api/orders` body (Invariant 6).
+
 import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createOrderSchema } from '@/lib/domain/schemas';
 import { cn } from '@/lib/utils';
 
+/**
+ * Field → label, and by extension the list of fields: `FieldName` is derived
+ * from these keys, and `buildInput` iterates them. Adding a field to the
+ * schema means adding it here, and TypeScript then flags every `Values`
+ * literal that misses it.
+ */
 export const LABELS = {
   title: 'Title',
   customerName: 'Customer name',
@@ -23,9 +35,15 @@ export const LABELS = {
 } as const;
 
 export type FieldName = keyof typeof LABELS;
-/** The form holds every field as a string; `coerce` puts it back into schema shape. */
+/**
+ * The form holds every field as a string; `coerce` puts it back into schema
+ * shape. Strings are what `<input>`, Select and the date picker naturally
+ * produce, and keeping them unparsed until validation means a half-typed
+ * number never becomes `NaN` in state.
+ */
 export type Values = Record<FieldName, string>;
 
+/** The pristine form. `quantity` defaults to 1 since a single sign is the common case. */
 export const EMPTY_VALUES: Values = {
   title: '',
   customerName: '',
@@ -39,17 +57,30 @@ export const EMPTY_VALUES: Values = {
   notes: '',
 };
 
+/** Fields the schema types as numbers; `coerce` converts these, everything else stays a string. */
 const NUMERIC: FieldName[] = ['widthCm', 'heightCm', 'quantity'];
 
+/** Shared control styling (DESIGN.md "Inputs"), including the red border on `aria-invalid`. */
 export const FIELD_INPUT_CLASS =
   'h-auto rounded-[8px] border-slate-300 px-2.5 py-2 text-[14px] leading-5 shadow-none aria-invalid:border-[#DC2626]';
 
+/**
+ * One field's form string in the type `createOrderSchema` expects. Empty
+ * numeric fields become `NaN` (not `0`) so the schema's range rule rejects
+ * them and `fieldError` can say "is required"; blank notes become `null`,
+ * matching the optional field's wire shape.
+ */
 export function coerce(name: FieldName, values: Values): unknown {
   if (NUMERIC.includes(name)) return values[name] === '' ? Number.NaN : Number(values[name]);
   if (name === 'notes') return values.notes.trim() ? values.notes : null;
   return values[name];
 }
 
+/**
+ * The whole form coerced into a candidate request body. `CreateOrderDialog`
+ * parses this with `createOrderSchema` to gate submit and sends the parsed
+ * output, so the server receives exactly what the client validated.
+ */
 export function buildInput(values: Values): Record<string, unknown> {
   return Object.fromEntries((Object.keys(LABELS) as FieldName[]).map((name) => [name, coerce(name, values)]));
 }
@@ -71,6 +102,12 @@ export function fieldErrorId(name: FieldName): string {
   return `order-${name}-error`;
 }
 
+/**
+ * Label + control + error slot for one field. The `htmlFor` / `id`
+ * (`order-<name>`) and `aria-describedby` / `fieldErrorId` pairs are what
+ * make the inline error announced by screen readers, so every control in this
+ * file follows the same id convention.
+ */
 export function Field({
   name,
   error,
@@ -133,6 +170,7 @@ export function TextField({
   );
 }
 
+/** "17 Sep 2026" for the date button; built once, the formatter is not cheap to construct. */
 const longDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 /**

@@ -1,10 +1,19 @@
 'use client';
 
+// components/orders — keyboard-focus bookkeeping for the controlled overlays
+// (detail sheet, transition dialog, create dialog). Shadcn/Radix overlays
+// restore focus to their Trigger on close; ours are opened from state by the
+// dashboard and have none, so this hook does the restoring instead.
+
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
-// The capture below has to beat Radix's FocusScope, which moves focus into the
-// overlay from a passive effect on mount. Layout effects all run first, so the
-// opener is still the active element when we read it.
+/**
+ * The capture below has to beat Radix's FocusScope, which moves focus into the
+ * overlay from a passive effect on mount. Layout effects all run first, so the
+ * opener is still the active element when we read it. On the server there is
+ * no layout phase and React warns about `useLayoutEffect`, so the SSR build
+ * falls back to `useEffect` (it never runs there anyway).
+ */
 const useCaptureEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /**
