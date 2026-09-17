@@ -50,7 +50,7 @@ One section per requirement in [`SignCraft_Task_Specification.md`](SignCraft_Tas
 
 **Where.** `app/api/**/route.ts` — eleven handlers, no other server entry points — with the shared plumbing in `lib/api/` (`errors.ts`, `persona.ts`, `validate.ts`, `params.ts`, `respond.ts`) and the work itself in `lib/services/`.
 
-**How.** Every handler is an App Router route handler on the Node runtime (`export const runtime = 'nodejs'`), and every one is four lines of the same shape: parse the path param, resolve the persona, hand a Zod-validated body to a service, respond. The largest file under `app/api` is 33 lines.
+**How.** Every handler is an App Router route handler on the Node runtime (`export const runtime = 'nodejs'`), and every one follows the same shape: parse the path param, resolve the persona, hand a Zod-validated body to a service, respond — a handful of statements each, now carrying JSDoc that names the method, persona, body, success shape and error codes.
 
 | Route | Method | Does |
 |---|---|---|
@@ -75,7 +75,7 @@ Three rules keep them thin. `withErrorHandling` wraps every export, so a handler
 - `tests/unit/api/errors.test.ts`, `tests/unit/api/persona.test.ts`, `tests/unit/api/validate.test.ts` cover the plumbing.
 - `tests/integration/events-route.test.ts › returns the SSE headers, a connected comment, and a real job.updated frame`.
 
-**Limits.** There is no OpenAPI document and no generated client — the shared Zod schemas in `lib/domain/schemas.ts` are the contract, which works because both ends are in this repo. Route handlers are unversioned (`/api/...`, not `/api/v1/...`), which a real product would regret.
+**Limits.** There is now an OpenAPI 3.1 document (`public/openapi.yaml`, rendered at `/api-docs`), kept in step with the routes by `tests/unit/api/openapi.test.ts` rather than by discipline alone. There is still no generated client — the shared Zod schemas in `lib/domain/schemas.ts` remain the compile-time contract, which works because both ends are in this repo. Route handlers are still unversioned (`/api/...`, not `/api/v1/...`), which a real product would regret.
 
 ## 5. State lifecycle and validation
 
@@ -242,10 +242,11 @@ Which columns exist at all is a persona question, handled by the pure helpers in
 **How.** The repository is the whole codebase, not an export of it: application code, Prisma schema and seed, both test suites, the specs the implementation was written from, and the docs. Nothing is vendored away and nothing is hidden behind a build artefact.
 
 ```
-app/            pages and the eleven API route handlers
-components/     board, orders, jobs, uploads, layout, ui (Shadcn)
+app/            pages and the eleven API route handlers; api-docs/ — the Swagger UI page
+components/     board, orders, jobs, uploads, layout, api-docs, ui (Shadcn)
 lib/            domain (pure) · services (all DB access) · db · storage · realtime · upload · api · query · board · persona · hooks
 prisma/         schema.prisma, seed.ts
+public/         openapi.yaml — the API contract, rendered at /api-docs
 scripts/        list-r2.ts — lists what is actually in the R2 bucket
 tests/          unit/ (no infrastructure) · integration/ (real Atlas) · helpers/
 docs/           architecture spec, 17 ADRs, UI pages-and-flows spec, design tokens
@@ -284,7 +285,7 @@ Pointing every environment at one MongoDB Atlas cluster instead makes local deve
 
 Deeper design material lives in `docs/superpowers/specs/`: the architecture design, 17 ADRs with the alternatives that were rejected, and the UI pages-and-flows spec. The README's "Trade-offs" section is the honest summary of those ADRs, including the ones amended during implementation.
 
-**Verify.** Every command printed in the README was run: `pnpm test` → 284 passed; `pnpm typecheck` and `pnpm lint` → clean; `pnpm test:integration` → 47 passed, plus the asset-guard case added afterwards (`pnpm vitest run --project integration tests/integration/assets.test.ts` → 15 passed), which is the 48 the README quotes.
+**Verify.** Every command printed in the README was run: `pnpm test` → 325 passed; `pnpm typecheck` and `pnpm lint` → clean; `pnpm test:integration` → 47 passed, plus the asset-guard case added afterwards (`pnpm vitest run --project integration tests/integration/assets.test.ts` → 15 passed), which is the 48 the README quotes.
 
 **Limits.** The README documents the system as built; where an ADR was amended during implementation the amendment is recorded in `docs/superpowers/specs/2026-09-16-signcraft-decisions.md` rather than by rewriting the original decision.
 

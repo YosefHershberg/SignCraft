@@ -255,6 +255,16 @@ All routes under `app/api/`. JSON in and out. Errors follow §12.
 - `POST /api/assets/:id/abort` accepts an **optional** body `{ reason?: 'user' | 'error' }`. `'error'` — what the uploader sends once it has exhausted its part retries — records the asset **FAILED** so the row offers Retry (UI spec §7.6); the default `'user'` records **ABORTED**. An empty body is valid and means `'user'`, so a bare `POST` (curl, `navigator.sendBeacon`) still works.
 - `POST /api/jobs/:id/claim` also returns **404 `NOT_FOUND`** when the job id does not exist (distinguished from 409 `CLAIM_TAKEN` by a follow-up read).
 
+**Amended 2026-09-17 (OpenAPI):** the surface above is now also described by `public/openapi.yaml`, rendered interactively at `/api-docs` (Swagger UI). That spec, not this table, is the normative and test-enforced description of the surface — `tests/unit/api/openapi.test.ts` fails the build if a route file and the spec drift on path, method or error codes. Contract detail the table above and §12 do not carry:
+
+- `409 VERSION_CONFLICT` is not only the order-transition conflict: `POST /api/assets/:id/parts` and `POST /api/assets/:id/complete` also return it, with `details.status`, when the asset is no longer `PENDING`/`UPLOADING`.
+- `502 STORAGE_ERROR` carries `details.op`, the name of the failed S3 operation.
+- `parts` and `complete` re-check the order on every call (`assertOrderStillUploadable`), not just at create, and can return 403 or 400 `GUARD_FAILED`/`ORDER_NOT_UPLOADABLE` if the vendor accepted the order while parts were still in flight.
+- `POST /api/assets/:id/progress` is a silent `204` for a well-formed but unknown asset id (only a malformed id is 404), whereas `POST /api/assets/:id/abort` on an unknown id is `404`.
+- `POST /api/assets` is `404` for an unknown `orderId`.
+- `GET /api/bootstrap` and `GET /api/events` read no persona at all, and bootstrap returns every order to every persona — read filtering is client-side by design (§7).
+- Any unhandled throw anywhere in the API surface is `500 INTERNAL`.
+
 Route Handler conventions: `export const runtime = 'nodejs'` everywhere (Prisma needs Node), `dynamic = 'force-dynamic'` on reads. One handler file per route, thin: parse → persona → call a function in `lib/services/*` → respond. Business logic lives in `lib/services`, never in route files, so integration tests call services directly.
 
 ## 9. Concurrency: claim locking and expiry

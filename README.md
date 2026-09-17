@@ -8,6 +8,21 @@ A requirement-by-requirement walkthrough (what each rule means, where it lives, 
 
 ---
 
+## Contents
+
+- [What it does](#what-it-does)
+- [Quick start](#quick-start)
+- [Personas and the two-tab recipe](#personas-and-the-two-tab-recipe)
+- [Stack](#stack)
+- [Architecture](#architecture)
+- [API documentation](#api-documentation)
+- [Code documentation](#code-documentation)
+- [Configuration](#configuration)
+- [Tests](#tests)
+- [Trade-offs](#trade-offs)
+- [Manual QA checklist](#manual-qa-checklist)
+- [Repository layout](#repository-layout)
+
 ## What it does
 
 Three things the assessment asks to be judged on:
@@ -64,6 +79,7 @@ The `sc_persona` cookie only *seeds* the first render of a tab; after that each 
 | Object storage | Cloudflare R2 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` |
 | Validation | Zod 4 (`lib/domain/schemas.ts`, shared by API and forms) |
 | Tests | Vitest (unit + integration); `@testing-library/react` + jsdom for one component test file |
+| API docs | OpenAPI 3.1 (`public/openapi.yaml`), Swagger UI from CDN at `/api-docs` |
 | Hosting | Vercel (Node runtime, Fluid compute) |
 
 ## Architecture
@@ -80,7 +96,7 @@ The `sc_persona` cookie only *seeds* the first render of a tab; after that each 
 
 No Redis, no worker, no cron. Everything that needs coordination is one atomic write to MongoDB; everything that needs to be live is a change stream forwarded as SSE.
 
-Layering is enforced by convention and by the tests: `lib/domain` is pure (no Prisma, no React, no fetch) and is imported by both client and server; `lib/services` is the only place that talks to the database; route handlers parse, resolve the persona, call a service, and respond — the largest file under `app/api` is 33 lines, most are under 20.
+Layering is enforced by convention and by the tests: `lib/domain` is pure (no Prisma, no React, no fetch) and is imported by both client and server; `lib/services` is the only place that talks to the database; route handlers parse, resolve the persona, call a service, and respond — a handful of statements each, the same shape every time, now documented route by route in [API documentation](#api-documentation).
 
 ### Database schema
 
@@ -206,6 +222,57 @@ Two fields are easy to leave out and each breaks uploads differently. Without `A
 
 Clients (`lib/realtime/use-realtime.ts`) apply each event straight into the TanStack Query cache with `setQueryData`, so cards move without a refetch. The connection indicator runs a four-state machine — `connecting | live | reconnecting | degraded` — and after **3** consecutive failures falls back to refetching every **10 s** and shows an amber "Polling every 10 s". That fallback is the only polling in the system, and it is off in normal operation; returning to `live` invalidates the cache once and stops it.
 
+## API documentation
+
+The eleven routes above are also described as an OpenAPI 3.1 document, kept honest by a test rather than by hand:
+
+- **Interactive reference:** `/api-docs` — locally [`http://localhost:3000/api-docs`](http://localhost:3000/api-docs), live [`https://signcraft-blond.vercel.app/api-docs`](https://signcraft-blond.vercel.app/api-docs). It renders Swagger UI (loaded from the `swagger-ui-dist@5` CDN, no new runtime dependency) with "Try it out" enabled.
+- **Raw spec:** `/openapi.yaml` on either host, or [`public/openapi.yaml`](public/openapi.yaml) in the repo.
+- **Authorize.** Click "Authorize" in Swagger UI and set the `x-persona` header to `ops`, `vendor:<id>`, or `installer:<id>`. The `<id>` values are 24-hex Mongo ids — fetch them once from `GET /api/bootstrap` (each vendor/installer object's `id`) and reuse them for every "Try it out" call in the session.
+- **Kept honest by a test.** `tests/unit/api/openapi.test.ts` fails the unit run if any `app/api/**/route.ts` is missing from the spec, if a route's exported HTTP methods differ from what the spec documents, or if the `ErrorCode` or status enums drift from the source. Lint the spec itself with:
+
+  ```bash
+  pnpm --package=@redocly/cli dlx redocly lint public/openapi.yaml
+  ```
+
+### Route table
+
+| Method | Path | Persona | Success | Notable errors |
+|---|---|---|---|---|
+| GET | `/api/bootstrap` | any (header not read) | 200 `BootstrapDTO` | 500 |
+| POST | `/api/orders` | ops | 201 `OrderDTO` | 400 `VALIDATION_ERROR`, 403 |
+| POST | `/api/orders/{id}/transition` | any (rules per transition) | 200 `OrderDTO` | 400 `INVALID_TRANSITION` / `GUARD_FAILED`, 403, 404, 409 `VERSION_CONFLICT` |
+| POST | `/api/jobs/{id}/claim` | installer | 200 `JobDTO` | 403, 404, 409 `CLAIM_TAKEN` |
+| POST | `/api/jobs/{id}/verify` | installer (the claimant) | 200 `JobDTO` | 400, 403, 404, 409 `CLAIM_EXPIRED` / `NOT_CLAIMANT` |
+| POST | `/api/assets` | ops | 201 `{asset, uploadId, partSize, partCount}` | 400 `VALIDATION_ERROR` / `GUARD_FAILED`, 403, 404, 502 `STORAGE_ERROR` |
+| POST | `/api/assets/{id}/parts` | ops | 200 `{urls}` | 400, 403, 404, 409 `VERSION_CONFLICT`, 502 `STORAGE_ERROR` |
+| POST | `/api/assets/{id}/progress` | ops | 204 | 400, 403, 404 |
+| POST | `/api/assets/{id}/complete` | ops | 200 `AssetDTO` | 400, 403, 404, 409 `VERSION_CONFLICT`, 502 `STORAGE_ERROR` |
+| POST | `/api/assets/{id}/abort` | ops | 204 | 400, 403, 404 |
+| GET | `/api/events` | any (header not read) | 200 `text/event-stream` | 500 |
+
+### Contract details the spec records that the architecture doc's §8/§12 tables did not
+
+- `409 VERSION_CONFLICT` is not only the order-transition conflict: `parts` and `complete` also return it, with `details.status`, when the asset is no longer `PENDING`/`UPLOADING`.
+- `502 STORAGE_ERROR` carries `details.op`, naming the S3 operation that failed.
+- `parts` and `complete` re-check the order on every call, not just at asset creation, so they can return 403 or 400 `GUARD_FAILED`/`ORDER_NOT_UPLOADABLE` if the vendor accepted the order while parts were still in flight.
+- `progress` is a silent 204 for a well-formed but unknown asset id (only a malformed id is 404), while `abort` on an unknown id is a 404.
+- `POST /api/assets` is 404 for an unknown `orderId`.
+- `bootstrap` and `events` read no persona at all, and bootstrap returns every order to every persona — read filtering is client-side by design, as [Personas and the two-tab recipe](#personas-and-the-two-tab-recipe) explains.
+- Any unhandled throw anywhere in the API surface comes out as 500 `INTERNAL`.
+
+## Code documentation
+
+Every module under `lib/`, `app/`, and `components/` — except the vendored Shadcn primitives in `components/ui/` — carries a file header naming its role and JSDoc on its exports explaining what it does and why it sits where it does in the three pipelines (order transition, claim race, upload). The JSDoc cross-references the architecture spec's numbered sections and the ADRs by number, so "why this shape" is one click from the code.
+
+Three places to start reading:
+
+- `lib/domain/state-machine.ts` + `lib/domain/permissions.ts` — the state machine: the transition table and who may take each edge.
+- `lib/services/jobs.ts` + `lib/domain/claims.ts` — the claim lock and its lazy expiry.
+- `lib/upload/uploader.ts` + `lib/services/assets.ts` — the upload pipeline: the browser-side multipart algorithm and the server-side presign/complete/abort bookkeeping.
+
+And the realtime fan-out that all three rely on: `lib/realtime/sse.ts` + `lib/realtime/apply-event.ts`.
+
 ## Configuration
 
 `.env.example` is the list of truth. Never commit `.env`.
@@ -222,12 +289,12 @@ Clients (`lib/realtime/use-realtime.ts`) apply each event straight into the TanS
 ## Tests
 
 ```bash
-pnpm test                 # 284 unit tests, no infrastructure, about 15 s
+pnpm test                 # 325 unit tests, no infrastructure, about 13 s
 pnpm test:integration     # 48 integration tests against Atlas, ~4.5 min
 pnpm typecheck            # tsc --noEmit
 ```
 
-Unit tests (`tests/unit/`, 26 files) cover the pure modules: the transition table and guards, the persona parser, the claim-expiry predicate, the SSE frame mapping and connection state machine, the DTO normaliser, the part plan and ETA maths, the uploader (with a fake `put`), and one component test file (`tests/unit/jobs/job-chip.test.tsx`, 5 tests) under jsdom.
+Unit tests (`tests/unit/`, 27 files) cover the pure modules: the transition table and guards, the persona parser, the claim-expiry predicate, the SSE frame mapping and connection state machine, the DTO normaliser, the part plan and ETA maths, the uploader (with a fake `put`), one component test file (`tests/unit/jobs/job-chip.test.tsx`, 5 tests) under jsdom, and the OpenAPI contract test (`tests/unit/api/openapi.test.ts`, 41 tests), which parses `public/openapi.yaml` and fails the run if a route file and the spec disagree on path, method, or the `ErrorCode`/status enums.
 
 Integration tests (`tests/integration/`, 8 files) run against a real MongoDB replica set and mock R2 at the `lib/storage/r2.ts` boundary. They cover the claim race and expiry, verification outcomes, every transition rule through both the services and the exported route handlers, the asset lifecycle, the seed, and a real change-stream round trip (`tests/integration/sse.test.ts › emits a job.updated frame within 5s of a real InstallJob update`).
 
@@ -293,12 +360,14 @@ Roughly 10 minutes, and it exercises every flow in UI spec §7. Start here even 
 app/
   page.tsx                 server component: bootstrap fetch, renders <Dashboard>
   api/                     route handlers (thin: parse → persona → service → respond)
+  api-docs/                Swagger UI page, serving public/openapi.yaml
 components/
   board/                   kanban board, columns, cards, mobile tabs
   orders/                  detail sheet, create/transition dialogs, history
   jobs/                    claim button, countdown, verification dialog
   uploads/                 upload panel, asset rows, simulate dialog
   layout/                  app header: persona switcher, connection indicator, count pills
+  api-docs/                the Swagger UI component mounted by app/api-docs
   ui/                      Shadcn primitives
 lib/
   domain/                  pure: state machine, permissions, claims, constants, schemas
@@ -313,8 +382,9 @@ lib/
   persona/                 the client persona context and its cookie seed
   hooks/                   useNow, the one shared 1 s clock
 prisma/                    schema.prisma, seed.ts
+public/openapi.yaml        the API contract, rendered at /api-docs
 scripts/                   list-r2.ts, the bucket check
-tests/                     unit/ (no infra), integration/ (real Atlas), helpers/
+tests/                     unit/ (no infra, incl. tests/unit/api/openapi.test.ts), integration/ (real Atlas), helpers/
 docs/superpowers/specs/    architecture, ADRs, UI pages and flows
 docs/design/               visual design tokens and exported screens
 EXPLANATIONS.md            requirement-by-requirement walkthrough
